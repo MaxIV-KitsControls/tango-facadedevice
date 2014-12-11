@@ -34,8 +34,8 @@ metaclass. The proxy device supports the following objects:
 In order to define the state and status of the device, these two methods can
 be overriden:
 
-- **state__from__data**: return the state to set, or None
-- **status__from__data**: return the status to set, or None
+- **state___from___data**: return the state to set, or None
+- **status___from___data**: return the status to set, or None
 
 Moreover, the `Proxy` device is fully subclassable in a standard pythonic way 
 (super, calls to parent methods, etc).
