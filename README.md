@@ -39,7 +39,7 @@ be overriden:
 
 Moreover, the `Proxy` device is fully subclassable in a standard pythonic way 
 (super, calls to parent methods, etc).
- 
+
 Example
 -------
 
@@ -87,6 +87,13 @@ class CameraScreen(Proxy):
             return "Conflict between IN and OUT informations"
         return "IN" if data['StatusIn'] else "OUT"
 ```
+
+Unit testing
+------------
+
+The package is unittested using `devicetest` and the example class given above.
+
+Statement coverage is currently greater than 84%.
 
 Contact
 -------
