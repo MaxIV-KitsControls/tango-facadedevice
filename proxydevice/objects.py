@@ -138,6 +138,10 @@ class proxy_command(proxy_object):
             device_proxy = device._proxy_device_dct[prop]
             # Get attribute name
             attr = getattr(device, self.attr.lower())
+            # Check attribute
+            if attr.strip().lower() == "none":
+                msg = "no attribute for {0} property."
+                raise ValueError(msg.format(self.attr))
             # Write
             device_proxy.write_attribute(attr, self.value)
         # Set command
