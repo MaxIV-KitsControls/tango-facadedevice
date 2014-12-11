@@ -6,7 +6,7 @@ from devicetest import DeviceTestCase
 from PyTango import DevFailed, DevState
 
 # Proxy imports
-from proxydevice import Proxy, ProxyMeta 
+from proxydevice import Proxy, ProxyMeta
 from proxydevice import device as proxy_module
 from proxydevice import proxy_command, proxy_attribute, logical_attribute
 
@@ -14,32 +14,32 @@ from proxydevice import proxy_command, proxy_attribute, logical_attribute
 # Example
 class CameraScreen(Proxy):
     __metaclass__ = ProxyMeta
-    
+
     # Proxy attributes
     StatusIn = proxy_attribute(
-        device="OPCDevice", 
-        attr="InStatusTag", 
+        device="OPCDevice",
+        attr="InStatusTag",
         dtype=bool)
 
     StatusOut = proxy_attribute(
-        device="OPCDevice", 
-        attr="OutStatusTag", 
+        device="OPCDevice",
+        attr="OutStatusTag",
         dtype=bool)
 
     # Logical attributes
     @logical_attribute(dtype=bool)
     def Error(self, data):
         return data["StatusIn"] == data["StatusOut"]
-    
+
     # Proxy commands
     MoveIn = proxy_command(
-        device="OPCDevice", 
-        attr="InCmdTag", 
+        device="OPCDevice",
+        attr="InCmdTag",
         value=1)
 
     MoveOut = proxy_command(
-        device="OPCDevice", 
-        attr="OutCmdTag", 
+        device="OPCDevice",
+        attr="OutCmdTag",
         value=1)
 
     # State
@@ -77,7 +77,7 @@ class ProxyTestCase(DeviceTestCase):
     def test_attributes(self):
         # Expected values
         tags = ['tag3', 'tag4']
-        states = [[DevState.FAULT, DevState.EXTRACT], 
+        states = [[DevState.FAULT, DevState.EXTRACT],
                   [DevState.INSERT, DevState.FAULT]]
         status = [["Conflict", "OUT"], ["IN", "Conflict"]]
         # InStatus in [False, True]
@@ -101,4 +101,4 @@ class ProxyTestCase(DeviceTestCase):
         # MoveOut command
         self.device.MoveOut()
         self.proxy.write_attribute.assert_called_with("tag2", 1)
-        
+

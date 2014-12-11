@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from proxydevice.objects import proxy_object
 
 # PyTango
-from PyTango.server import Device, DeviceMeta 
+from PyTango.server import Device, DeviceMeta
 from PyTango import DeviceProxy, DevFailed, DevState
 
 
@@ -108,7 +108,7 @@ class Proxy(Device):
     def status_from_data(self, data):
         """Method to override."""
         return None
- 
+
 
 # Forwarder metaclass
 def ProxyMeta(name, bases, dct):

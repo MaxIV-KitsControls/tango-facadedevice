@@ -32,7 +32,7 @@ def catch_key_error(func=None, dtype=int):
 # Base proxy object
 class proxy_object(object):
     """Provide a base for objects to be processed by ProxyMeta."""
-    
+
     def update_class(self, dct):
         """Method to override."""
         raise NotImplementedError
@@ -41,7 +41,7 @@ class proxy_object(object):
 # Base attribute object
 class base_attribute(proxy_object):
     """Provide a base for enhanced Tango attributes."""
-    
+
     def __init__(self, **kwargs):
         """Init with tango attribute keywords."""
         self.kwargs = kwargs
@@ -60,16 +60,16 @@ class base_attribute(proxy_object):
         # Set read method
         dct[reader_name] = catch_key_error(reader, dtype)
 
-        
+
 # Proxy attribute object
 class proxy_attribute(base_attribute):
-    """Tango attribute linked to the attribute of a remote device. 
-    Device and attribute are given as property names. 
+    """Tango attribute linked to the attribute of a remote device.
+    Device and attribute are given as property names.
     Also supports the standard attribute keywords.
     """
 
     def __init__(self, device, attr, **kwargs):
-        """Initialize with the device property name, the attribute property 
+        """Initialize with the device property name, the attribute property
         name and the standard tango attribute keywords.
         """
         self.device = device
@@ -94,9 +94,9 @@ class proxy_attribute(base_attribute):
 
 # Logical attribute object
 class logical_attribute(base_attribute):
-    """Tango attribute computed from the values of other attributes. 
-    Use it as a decorator to register the function that make this computation. 
-    The decorated method take the attribute value dictionnary as argument. 
+    """Tango attribute computed from the values of other attributes.
+    Use it as a decorator to register the function that make this computation.
+    The decorated method take the attribute value dictionnary as argument.
     Logical attributes also support the standard attribute keywords.
     """
 
@@ -112,13 +112,13 @@ class logical_attribute(base_attribute):
 
 # Proxy command object
 class proxy_command(proxy_object):
-    """Command to write an attribute of a remote device with a given value. 
-    Attribute and device are given as property names. 
+    """Command to write an attribute of a remote device with a given value.
+    Attribute and device are given as property names.
     It supports standard command keywords.
     """
-    
+
     def __init__(self, device, attr, value, **kwargs):
-        """Initialize with the device property name, the attribute property 
+        """Initialize with the device property name, the attribute property
         name, the value to write and the standard tango attribute keywords.
         """
         self.kwargs = kwargs
