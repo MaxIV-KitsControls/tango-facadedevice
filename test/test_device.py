@@ -2,18 +2,23 @@
 
 # Imports
 from mock import Mock
+from PyTango.server import command
 from devicetest import DeviceTestCase
 from PyTango import DevFailed, DevState
 
 # Proxy imports
 from proxydevice import Proxy, ProxyMeta
 from proxydevice import device as proxy_module
-from proxydevice import proxy_command, proxy_attribute, logical_attribute
+from proxydevice import proxy_command, proxy_attribute
+from proxydevice import proxy, logical_attribute
 
 
 # Example
 class CameraScreen(Proxy):
     __metaclass__ = ProxyMeta
+
+    # Proxy
+    PLCDevice = proxy("PLCDevice")
 
     # Proxy attributes
     StatusIn = proxy_attribute(
@@ -42,6 +47,11 @@ class CameraScreen(Proxy):
         attr="OutCmdTag",
         value=1)
 
+    # Property
+    @property
+    def connected(self):
+        return bool(self.data)
+
     # State
     def state_from_data(self, data):
         if data['Error']:
@@ -51,8 +61,12 @@ class CameraScreen(Proxy):
     # Status
     def status_from_data(self, data):
         if data['Error']:
-            return "Conflict between IN and OUT informations"
+            return "Conflict"# between IN and OUT informations"
         return "IN" if data['StatusIn'] else "OUT"
+
+    @command
+    def Reset(self):
+        self.devices["PLCDevice"].Reset()
 
 
 # Device test case
@@ -64,13 +78,14 @@ class ProxyTestCase(DeviceTestCase):
                   "OutCmdTag":    "tag2",
                   "InStatusTag":  "tag3",
                   "OutStatusTag": "tag4",
-                  "OPCDevice":    "a/b/c"}
+                  "OPCDevice":    "a/b/c",
+                  "PLCDevice":    "c/d/e"}
 
     @classmethod
     def mocking(cls):
         # Mock DeviceProxy
-        DeviceProxy = proxy_module.DeviceProxy = Mock()
-        cls.proxy = DeviceProxy.return_value
+        cls.DeviceProxy = proxy_module.DeviceProxy = Mock(name="DeviceProxy")
+        cls.proxy = cls.DeviceProxy.return_value
         cls.bool_attr = [Mock(value=False), Mock(value=True)]
         cls.proxy.read_attributes.return_value = [cls.bool_attr[False]]*2
 
@@ -82,7 +97,7 @@ class ProxyTestCase(DeviceTestCase):
         status = [["Conflict", "OUT"], ["IN", "Conflict"]]
         # InStatus in [False, True]
         for x in range(2):
-            # OutStatus in [Flase, True]
+            # OutStatus in [False, True]
             for y in range(2):
                 # Perform tests
                 return_value = [self.bool_attr[x], self.bool_attr[y]]
@@ -93,6 +108,11 @@ class ProxyTestCase(DeviceTestCase):
                 self.assertEqual(self.device.state(), states[x][y])
                 self.assertIn(status[x][y], self.device.status())
                 self.proxy.read_attributes.assert_called_with(tags)
+        # Proxy
+        args_list = [x.args for x in self.DeviceProxy.call_args_list]
+        self.assertEqual(len(args_list), 2)
+        self.assertIn(("a/b/c",), args_list)
+        self.assertIn(("c/d/e",), args_list)
 
     def test_commands(self):
         # MoveIn command
@@ -101,4 +121,7 @@ class ProxyTestCase(DeviceTestCase):
         # MoveOut command
         self.device.MoveOut()
         self.proxy.write_attribute.assert_called_with("tag2", 1)
+        # Rest command
+        self.device.Reset()
+        self.proxy.Reset.assert_called_once()
 
