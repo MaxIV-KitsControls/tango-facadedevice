@@ -11,7 +11,7 @@ def safe_read(fname):
 
 # Setup
 setup(name = "tangods-proxydevice",
-      version = "0.1.5",
+      version = "0.1.6",
       description = "Provide a proxy device to subclass.",
       author="Vincent Michel",
       author_email="vincent.michel@maxlab.lu.se",
