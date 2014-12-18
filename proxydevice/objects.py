@@ -13,10 +13,11 @@ class class_object(object):
         """Method to override."""
         raise NotImplementedError
 
+
 # Proxy object
 class proxy(class_object):
     """Tango DeviceProxy handled automatically by the Proxy device."""
-    
+
     def __init__(self, device):
         """Initialize with the device property name."""
         self.device = device
@@ -39,7 +40,7 @@ class logical_attribute(class_object):
         """Init with tango attribute keywords."""
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
-        self.method = None 
+        self.method = None
         self.attr = None
         self.device = None
 
@@ -53,13 +54,15 @@ class logical_attribute(class_object):
         # Attribute
         dct[key] = attribute(**self.kwargs)
         dct["_class_dct"]["attributes"][key] = self
+
         # Read method
-        reader_name = 'read_' + key
         def reader(device):
             """Read the value from attribute dictionary."""
             return device._data_dct[key]
+
+        # Set reader method
+        reader_name = 'read_' + key
         reader.__name__ = reader_name
-        # Set read method
         dct[reader_name] = catch_key_error(reader, self.dtype)
 
 
@@ -110,8 +113,8 @@ class proxy_command(proxy):
         # Register
         proxy.update_class(self, key, dct)
         dct["_class_dct"]["commands"][key] = self
-        # Create command
-        cmd = command(**self.kwargs)
+
+        # Command method
         def run_command(device):
             """Write the attribute of the remote device with the value."""
             # Get data
@@ -123,17 +126,20 @@ class proxy_command(proxy):
             # Write
             device_proxy = device._device_dct[key]
             device_proxy.write_attribute(attr, value)
+
         # Set command
+        cmd = command(**self.kwargs)
         run_command.__name__ = key
         dct[key] = cmd(run_command)
+
         # Is allowed method
-        method_name = "is_" + key + "_allowed"
         def is_allowed(device):
             """The method is allowed if the device is connected."""
             return device.connected
+
         # Set method
+        method_name = "is_" + key + "_allowed"
         is_allowed.__name__ = method_name
         dct[method_name] = is_allowed
         # Create properties
         dct[self.attr] = device_property(dtype=str, doc=self.attr)
-

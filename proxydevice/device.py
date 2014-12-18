@@ -20,7 +20,7 @@ def gen_read_dct():
 # Proxy device
 class Proxy(Device):
     """Provide base methods for a proxy device."""
-    
+
     @contextmanager
     def safe_context(self, exceptions, msg=""):
         """Catch errors and set the device to FAULT
@@ -86,8 +86,10 @@ class Proxy(Device):
                 self._method_dct[key] = value.method.__get__(self)
         # Get informations for commands
         for key, value in self._class_dct["commands"].items():
-            try: attr = getattr(self, value.attr.lower())
-            except AttributeError: attr = None
+            try:
+                attr = getattr(self, value.attr.lower())
+            except AttributeError:
+                attr = None
             self._command_dct[key] = attr, value.value
 
     def update(self):
@@ -134,7 +136,7 @@ class Proxy(Device):
     def data(self):
         """Data dictionary."""
         return self._data_dct
-                
+
     @property
     def devices(self):
         """The proxy dictionary."""
@@ -193,4 +195,3 @@ def ProxyMeta(name, bases, dct):
             value.update_class(key, dct)
     # Create device class
     return DeviceMeta(name, bases, dct)
-
