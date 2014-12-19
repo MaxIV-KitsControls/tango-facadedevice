@@ -4,7 +4,7 @@
 from mock import Mock
 from PyTango.server import command
 from devicetest import DeviceTestCase
-from PyTango import DevFailed, DevState
+from PyTango import DevState
 
 # Proxy imports
 from proxydevice import Proxy, ProxyMeta
@@ -61,7 +61,7 @@ class CameraScreen(Proxy):
     # Status
     def status_from_data(self, data):
         if data['Error']:
-            return "Conflict"# between IN and OUT informations"
+            return "Conflict between IN and OUT informations"
         return "IN" if data['StatusIn'] else "OUT"
 
     @command
@@ -104,7 +104,7 @@ class ProxyTestCase(DeviceTestCase):
                 self.proxy.read_attributes.return_value = return_value
                 self.assertEqual(self.device.StatusIn, x)
                 self.assertEqual(self.device.StatusOut, y)
-                self.assertEqual(self.device.Error, x==y)
+                self.assertEqual(self.device.Error, x == y)
                 self.assertEqual(self.device.state(), states[x][y])
                 self.assertIn(status[x][y], self.device.status())
                 self.proxy.read_attributes.assert_called_with(tags)
@@ -124,4 +124,3 @@ class ProxyTestCase(DeviceTestCase):
         # Rest command
         self.device.Reset()
         self.proxy.Reset.assert_called_once()
-
