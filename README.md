@@ -1,43 +1,45 @@
-tangods-proxydevice
+tangods-facadedevice
 ===================
 ***
 
-Provide a proxy device to subclass.
+Provide a facade device to subclass.
 
 Information
 -----------
 
- - Package: tangods-proxydevice
- - Device:  Proxy (+ ProxyMeta)
- - Repo:    [dev-maxiv-proxydevice][repo]
+ - Package: tangods-facadedevice
+ - Device:  Facade (+ FacadeMeta)
+ - Repo:    [dev-maxiv-facadedevice][repo]
 
-[repo]: https://gitorious.maxlab.lu.se/kits-maxiv/dev-maxiv-proxydevice/
+[repo]: https://gitorious.maxlab.lu.se/kits-maxiv/dev-maxiv-facadedevice/
 
 
 Usage
 -----
 
-In order to subclass the `Proxy`, it is required to define `ProxyMeta` as
-metaclass. The proxy device supports the following objects:
+In order to subclass the `Facade` device, it is required to define `FacadeMeta`
+as metaclass. The proxy device supports the following objects:
 
 - **proxy_attribute**: TANGO attribute linked to the attribute of a remote
   device. Attribute and device are given as property names. It supports the
   standard attribute keywords.
+
 - **logical_attribute**: TANGO attribute computed from the values of other
   attributes. Use it as a decorator to register the function that make this
   computation. The decorated method takes the attribute value dictionnary as
   argument. Logical attributes also support the standard attribute keywords.
+
 - **proxy_command**: TANGO command to write an attribute of a remote device
   with a given value. Attribute and device are given as property names. It
   supports standard command keywords.
 
-In order to define the state and status of the device, these two methods can
-be overriden:
+In order to define the state and status of the device, these two methods can be
+overriden:
 
 - **state_from _data**: return the state to set, or None
 - **status_from _data**: return the status to set, or None
 
-Moreover, the `Proxy` device is fully subclassable in a standard pythonic way
+Moreover, the `Facade` device is fully subclassable in a standard pythonic way
 (super, calls to parent methods, etc).
 
 Example
@@ -45,8 +47,8 @@ Example
 
 ```python
 # Example
-class CameraScreen(Proxy):
-    __metaclass__ = ProxyMeta
+class CameraScreen(Facade):
+    __metaclass__ = FacadeMeta
 
     # Proxy attributes
     StatusIn = proxy_attribute(
@@ -99,4 +101,3 @@ Contact
 -------
 
 Vincent Michel: vincent.michel@maxlab.lu.se
-

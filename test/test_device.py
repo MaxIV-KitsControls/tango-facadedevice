@@ -7,15 +7,15 @@ from devicetest import DeviceTestCase
 from PyTango import DevState
 
 # Proxy imports
-from proxydevice import Proxy, ProxyMeta
-from proxydevice import device as proxy_module
-from proxydevice import proxy_command, proxy_attribute
-from proxydevice import proxy, logical_attribute
+from facadedevice import Facade, FacadeMeta
+from facadedevice import device as proxy_module
+from facadedevice import proxy_command, proxy_attribute
+from facadedevice import proxy, logical_attribute
 
 
 # Example
-class CameraScreen(Proxy):
-    __metaclass__ = ProxyMeta
+class CameraScreen(Facade):
+    __metaclass__ = FacadeMeta
 
     # Proxy
     PLCDevice = proxy("PLCDevice")

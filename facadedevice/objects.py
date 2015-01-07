@@ -1,7 +1,7 @@
-"""Provide class objects for the proxy device."""
+"""Provide class objects for the facade device."""
 
 # Imports
-from proxydevice.common import catch_key_error
+from facadedevice.common import catch_key_error
 from PyTango.server import device_property, attribute, command
 
 
@@ -24,7 +24,7 @@ class proxy(class_object):
 
     def update_class(self, key, dct):
         """Register proxy and create device property."""
-        dct["_class_dct"]["devices"][key] = self
+        dct["_class_dict"]["devices"][key] = self
         dct[self.device] = device_property(dtype=str, doc=self.device)
 
 
@@ -53,12 +53,12 @@ class logical_attribute(class_object):
         """Create the attribute and read method."""
         # Attribute
         dct[key] = attribute(**self.kwargs)
-        dct["_class_dct"]["attributes"][key] = self
+        dct["_class_dict"]["attributes"][key] = self
 
         # Read method
         def reader(device):
             """Read the value from attribute dictionary."""
-            return device._data_dct[key]
+            return device._data_dict[key]
 
         # Set reader method
         reader_name = 'read_' + key
@@ -112,19 +112,19 @@ class proxy_command(proxy):
         """Create the command, methods and device properties."""
         # Register
         proxy.update_class(self, key, dct)
-        dct["_class_dct"]["commands"][key] = self
+        dct["_class_dict"]["commands"][key] = self
 
         # Command method
         def run_command(device):
             """Write the attribute of the remote device with the value."""
             # Get data
-            attr, value = device._command_dct[key]
+            attr, value = device._command_dict[key]
             # Check attribute
             if attr.strip().lower() == "none":
                 msg = "no attribute for {0} property."
                 raise ValueError(msg.format(self.attr))
             # Write
-            device_proxy = device._device_dct[key]
+            device_proxy = device._device_dict[key]
             device_proxy.write_attribute(attr, value)
 
         # Set command
