@@ -187,8 +187,8 @@ def FacadeMeta(name, bases, dct):
     """
     # Class attribute
     dct["_class_dict"] = {"attributes": {},
-                         "commands":   {},
-                         "devices":    {}}
+                          "commands":   {},
+                          "devices":    {}}
     # Proxy objects
     for key, value in dct.items():
         if isinstance(value, class_object):
