@@ -153,7 +153,9 @@ class proxy_command(proxy):
 
         # Set method
         method_name = "is_" + key + "_allowed"
-        is_allowed.__name__ = method_name
-        dct[method_name] = is_allowed
+        # prefer user defined "is_X_allowed" methods
+        if method_name not in dct:
+            is_allowed.__name__ = method_name
+            dct[method_name] = is_allowed
         # Create properties
         dct[self.attr] = device_property(dtype=str, doc=self.attr)
