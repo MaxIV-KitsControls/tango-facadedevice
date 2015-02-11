@@ -3,11 +3,12 @@
 # Imports
 from collections import defaultdict
 from contextlib import contextmanager
+from functools import partial
 from facadedevice.objects import class_object
 
 # PyTango
 from PyTango.server import Device, DeviceMeta
-from PyTango import DeviceProxy, DevFailed, DevState
+from PyTango import DeviceProxy, DevFailed, DevState, EventType
 
 
 # Read dictionary generator
@@ -57,6 +58,7 @@ class Facade(Device):
         self._method_dict = {}
         self._command_dict = {}
         self._read_dict = gen_read_dict()
+        self._evented_attrs = defaultdict(dict)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
             self.get_device_properties()
@@ -67,6 +69,14 @@ class Facade(Device):
         self.init_data_structure()
         # First update
         self.update()
+
+    def delete_device(self):
+        for proxy in self._device_dict.values():
+            for eid in self._evented_attrs[proxy.name()]:
+                try:
+                    proxy.unsubscribe_event(eid)
+                except DevFailed as e:
+                    pass  # nevermind?
 
     def init_data_structure(self):
         """Initialize the internal data structures."""
@@ -93,6 +103,27 @@ class Facade(Device):
             self._command_dict[key] = (attr, value.value, value.reset_value,
                                        value.reset_delay)
 
+    def listen_to_attributes(self, proxy, keys, attrs, dtypes):
+        "Try to setup event listeners for the attributes on a proxy"
+        for key, attr, dtype in zip(keys, attrs, dtypes):
+            try:
+                eid = proxy.subscribe_event(
+                    attr, EventType.CHANGE_EVENT,
+                    partial(self.handle_change_event, key, dtype))
+                self.set_change_event(attr, True, False)
+                self._evented_attrs[proxy.name()][key] = eid
+            except DevFailed:
+                pass  # assuming events aren't setup; ignore it
+
+    def handle_change_event(self, attr, dtype, event):
+        "Handle attribute change events"
+        data = event.attr_value
+        self._data_dict[attr] = data.value
+        self.push_change_event(attr, dtype(data.value),
+                               data.get_date().tv_sec,
+                               data.quality)
+        self.update_secondary()
+
     def update(self):
         """Update the device."""
         # Connection error
@@ -100,31 +131,43 @@ class Facade(Device):
             return
         # Try to access the proxy
         msg = "Cannot connect to proxy."
+        new_proxies = set()
         with self.safe_context((DevFailed), msg):
             # Connect to proxies
             for key, value in self._device_dict.items():
                 if isinstance(value, basestring):
-                    proxy = self._tmp_dict.get(value) or DeviceProxy(value)
-                    self._device_dict[key] = self._tmp_dict[value] = proxy
+                    if value not in self._tmp_dict:
+                        proxy = DeviceProxy(value)
+                        new_proxies.add(proxy)
+                        self._device_dict[key] = self._tmp_dict[value] = proxy
             # Read data
-            for lists in self._read_dict.values():
-                keys, attrs, dtypes = lists
+            for keys, attrs, dtypes in self._read_dict.values():
                 device_proxy = self._device_dict[keys[0]]
-                values = device_proxy.read_attributes(attrs)
+                nonevented = set(attrs) - set(self._evented_attrs.keys())
+                if nonevented:
+                    values = device_proxy.read_attributes(list(nonevented))
                 # Store data
                 for key, dtype, value in zip(keys, dtypes, values):
                     self._data_dict[key] = dtype(value.value)
-            # Update data
-            for key, method in self._method_dict.items():
-                self._data_dict[key] = method(self._data_dict)
-            # Set state
-            state = self.state_from_data(self._data_dict)
-            if state is not None:
-                self.set_state(state)
-            # Set status
-            status = self.status_from_data(self._data_dict)
-            if status is not None:
-                self.set_status(status)
+
+                if device_proxy in new_proxies:
+                    self.listen_to_attributes(proxy, keys, attrs, dtypes)
+
+            self.update_secondary()
+
+    def update_secondary(self):
+        # Update data
+        for key, method in self._method_dict.items():
+            self._data_dict[key] = method(self._data_dict)
+        # Set state
+        state = self.state_from_data(self._data_dict)
+        if state is not None:
+            self.set_state(state)
+        # Set status
+        status = self.status_from_data(self._data_dict)
+
+        if status is not None:
+            self.set_status(status)
 
     # Properties
 
