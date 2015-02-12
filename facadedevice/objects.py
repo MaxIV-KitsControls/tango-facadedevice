@@ -1,6 +1,8 @@
 """Provide class objects for the facade device."""
 
 # Imports
+import time
+
 from facadedevice.common import catch_key_error
 from PyTango.server import device_property, attribute, command
 
@@ -101,14 +103,23 @@ class proxy_command(proxy):
     It supports standard command keywords.
     """
 
-    def __init__(self, device, attr, value, **kwargs):
+    def __init__(self, device, attr, value, reset_value=None, reset_delay=0,
+                 **kwargs):
         """Initialize with the device property name, the attribute property
-        name, the value to write and the standard tango attribute keywords.
+        name, the value to write and the standard tango attribute
+        keywords.  Optionally you may add a reset_value and a
+        reset_delay [ms], meaning that the reset value will be written
+        after some time (e.g. for PLCs where the tag needs to be
+        zeroed again after setting). Note that this means that the
+        command will take at least reset_delay ms to complete
+
         """
         proxy.__init__(self, device)
         self.kwargs = kwargs
         self.value = value
         self.attr = attr
+        self.reset_value = reset_value
+        self.reset_delay = reset_delay
 
     def update_class(self, key, dct):
         """Create the command, methods and device properties."""
@@ -120,7 +131,7 @@ class proxy_command(proxy):
         def run_command(device):
             """Write the attribute of the remote device with the value."""
             # Get data
-            attr, value = device._command_dict[key]
+            attr, value, reset_value, reset_delay = device._command_dict[key]
             # Check attribute
             if attr.strip().lower() == "none":
                 msg = "no attribute for {0} property."
@@ -128,6 +139,9 @@ class proxy_command(proxy):
             # Write
             device_proxy = device._device_dict[key]
             device_proxy.write_attribute(attr, value)
+            if reset_value is not None:
+                time.sleep(reset_delay / 1000.0)
+                device_proxy.write_attribute(attr, reset_value)
 
         # Set command
         cmd = command(**self.kwargs)
@@ -141,7 +155,9 @@ class proxy_command(proxy):
 
         # Set method
         method_name = "is_" + key + "_allowed"
-        is_allowed.__name__ = method_name
-        dct[method_name] = is_allowed
+        # prefer user defined "is_X_allowed" methods
+        if method_name not in dct:
+            is_allowed.__name__ = method_name
+            dct[method_name] = is_allowed
         # Create properties
         dct[self.attr] = device_property(dtype=str, doc=self.attr)
