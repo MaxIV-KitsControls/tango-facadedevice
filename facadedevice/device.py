@@ -93,7 +93,8 @@ class Facade(Device):
                 attr = getattr(self, value.attr.lower())
             except AttributeError:
                 attr = None
-            self._command_dict[key] = attr, value.value
+            self._command_dict[key] = (attr, value.value, value.reset_value,
+                                       value.reset_delay)
 
     @cache_during("_update_period", "debug_stream")
     def update(self):
