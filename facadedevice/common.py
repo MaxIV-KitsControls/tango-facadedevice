@@ -27,7 +27,7 @@ def DeviceMeta(name, bases, attrs):
         dct.update(getattr(base, save_key, {}))
     dct.update(attrs)
     # Create device
-    return PyTango.server.DeviceMetag(name, bases, dct)
+    return PyTango.server.DeviceMeta(name, bases, dct)
 
 
 # Catch KeyError decorator
