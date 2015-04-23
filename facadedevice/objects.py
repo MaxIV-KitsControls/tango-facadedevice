@@ -2,9 +2,22 @@
 
 # Imports
 import time
-
-from facadedevice.common import catch_key_error
 from PyTango.server import device_property, attribute, command
+from facadedevice.common import catch_key_error, event_property, mapping
+
+# Constants
+PREFIX = ''
+SUFFIX = '_data'
+
+
+# Attribute data name
+def attr_data_name(key):
+    return PREFIX + key.lower() + SUFFIX
+
+
+# Attribute mapping
+def attribute_mapping(instance):
+    return mapping(instance, attr_data_name, instance._class_dict["attributes"])
 
 
 # Base class object
@@ -58,12 +71,13 @@ class logical_attribute(class_object):
         """Create the attribute and read method."""
         # Attribute
         dct[key] = attribute(**self.kwargs)
+        dct[attr_data_name(key)] = event_property(key)
         dct["_class_dict"]["attributes"][key] = self
 
         # Read method
         def reader(device):
             """Read the value from attribute dictionary."""
-            return device._data_dict[key]
+            return getattr(device, attr_data_name(key))
 
         # Set reader method
         reader_name = 'read_' + key
