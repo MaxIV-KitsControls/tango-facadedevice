@@ -20,12 +20,14 @@ class class_object(object):
 class proxy(class_object):
     """Tango DeviceProxy handled automatically by the Proxy device."""
 
-    def __init__(self, device):
+    def __init__(self, device=None):
         """Initialize with the device property name."""
         self.device = device
 
     def update_class(self, key, dct):
         """Register proxy and create device property."""
+        if not self.device:
+            self.device = key
         dct["_class_dict"]["devices"][key] = self
         dct[self.device] = device_property(dtype=str, doc=self.device)
 

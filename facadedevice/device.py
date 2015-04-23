@@ -5,9 +5,10 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 from facadedevice.objects import class_object
+from facadedevice.common import DeviceMeta, cache_during
 
 # PyTango
-from PyTango.server import Device, DeviceMeta
+from PyTango.server import Device, device_property
 from PyTango import DeviceProxy, DevFailed, DevState, EventType
 
 
@@ -21,6 +22,7 @@ def gen_read_dict():
 # Proxy device
 class Facade(Device):
     """Provide base methods for a facade device."""
+    __metaclass__ = DeviceMeta
 
     @contextmanager
     def safe_context(self, exceptions, msg=""):
@@ -62,6 +64,7 @@ class Facade(Device):
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
             self.get_device_properties()
+            self._update_period = float(self.UpdatePeriod)
         # Invalid property case
         if self.get_state() != DevState.INIT:
             return
@@ -124,6 +127,7 @@ class Facade(Device):
                                data.quality)
         self.update_secondary()
 
+    @cache_during("_update_period", "debug_stream")
     def update(self):
         """Update the device."""
         # Connection error
@@ -221,6 +225,13 @@ class Facade(Device):
     def status_from_data(self, data):
         """Method to override."""
         return None
+
+    # Device properties
+    UpdatePeriod = device_property(
+        dtype=str,
+        doc="Limit the refresh rate.",
+        default_value=0
+        )
 
 
 # Proxy metaclass
