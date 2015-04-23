@@ -75,8 +75,8 @@ class Facade(Device):
             for eid in self._evented_attrs[proxy.name()]:
                 try:
                     proxy.unsubscribe_event(eid)
-                except DevFailed as e:
-                    pass  # nevermind?
+                except DevFailed as exc:
+                    self.debug_stream(str(exc))
 
     def init_data_structure(self):
         """Initialize the internal data structures."""
@@ -231,8 +231,8 @@ def FacadeMeta(name, bases, dct):
     """
     # Class attribute
     dct["_class_dict"] = {"attributes": {},
-                         "commands":   {},
-                         "devices":    {}}
+                          "commands":   {},
+                          "devices":    {}}
     # Proxy objects
     for key, value in dct.items():
         if isinstance(value, class_object):

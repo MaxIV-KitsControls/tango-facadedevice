@@ -33,6 +33,7 @@ class proxy(class_object):
 # Logical attribute object
 class logical_attribute(class_object):
     """Tango attribute computed from the values of other attributes.
+
     Use it as a decorator to register the function that make this computation.
     The decorated method take the attribute value dictionnary as argument.
     Logical attributes also support the standard attribute keywords.
@@ -71,6 +72,7 @@ class logical_attribute(class_object):
 # Proxy attribute object
 class proxy_attribute(logical_attribute, proxy):
     """Tango attribute linked to the attribute of a remote device.
+
     Device and attribute are given as property names.
     Also supports the standard attribute keywords.
     """
@@ -85,6 +87,7 @@ class proxy_attribute(logical_attribute, proxy):
 
     def update_class(self, key, dct):
         """Create properties, attribute and read method.
+
         Also register useful informations in the property dictionary.
         """
         # Parent method
@@ -97,6 +100,7 @@ class proxy_attribute(logical_attribute, proxy):
 # Proxy command object
 class proxy_command(proxy):
     """Command to write an attribute of a remote device with a given value.
+
     Attribute and device are given as property names.
     It supports standard command keywords.
     """
@@ -105,12 +109,13 @@ class proxy_command(proxy):
                  **kwargs):
         """Initialize with the device property name, the attribute property
         name, the value to write and the standard tango attribute
-        keywords.  Optionally you may add a reset_value and a
+        keywords.
+
+        Optionally you may add a reset_value and a
         reset_delay [ms], meaning that the reset value will be written
         after some time (e.g. for PLCs where the tag needs to be
         zeroed again after setting). Note that this means that the
         command will take at least reset_delay ms to complete
-
         """
         proxy.__init__(self, device)
         self.kwargs = kwargs
