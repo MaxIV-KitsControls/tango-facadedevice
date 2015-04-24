@@ -1,8 +1,8 @@
 """Provide generic decorators."""
 
 # Imports
+import time
 import PyTango
-from time import time
 from collections import deque
 from functools import wraps, partial
 from weakref import WeakKeyDictionary
@@ -50,7 +50,7 @@ def catch_key_error(func=None, dtype=int):
                 return func(self)
             except KeyError:
                 quality = PyTango.AttrQuality.ATTR_INVALID
-                return dtype(), time(), quality
+                return dtype(), time.time(), quality
         return wrapper
     # Decorate
     if func:
@@ -80,6 +80,11 @@ def cache_during(timeout_attr, debug_stream=None):
             queue, value = cache.get(self, (deque(maxlen=10), None))
             stamp = queue[-1] if queue else -timeout
             now = time.time()
+            # Log periodicity
+            if len(queue):
+                msg = "{0} ran {1} times in the last {2:1.3f} seconds"
+                stream(msg.format(func_name, len(queue),
+                                  time.time() - queue[0]))
             # Use cache
             if stamp + timeout > now:
                 msg = "{0} called before expiration ({1:1.3f} s < {2:1.3f} s)"
@@ -92,10 +97,6 @@ def cache_during(timeout_attr, debug_stream=None):
             # Save cache and stamp
             queue.append(now)
             cache[self] = queue, value
-            if len(queue):
-                msg = "{0} ran {1} times in the last {2:1.3f} seconds"
-                stream(msg.format(func_name, len(queue),
-                                  time.time() - queue[0]))
             # Return
             return value
         return wrapper
@@ -111,11 +112,12 @@ class event_property(object):
     VALID = AttrQuality.ATTR_VALID
 
     def __init__(self, attribute, default=None, invalid=None,
-                 is_allowed=None, event=True, doc=None):
+                 is_allowed=None, event=True, dtype=None, doc=None):
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
         self.event = event
+        self.dtype = dtype
         self.__doc__ = doc
         default = getattr(attribute, "is_allowed_name", "")
         self.is_allowed = is_allowed or default
@@ -192,6 +194,8 @@ class event_property(object):
         return value, None, None
 
     def check_value(self, device, value, stamp, quality):
+        if self.dtype:
+            value = self.dtype(value)
         if value != self.invalid:
             return value, stamp, quality
         return self.get_default_value(device), stamp, self.INVALID
@@ -199,6 +203,8 @@ class event_property(object):
     def get_default_value(self, device):
         if self.default != self.invalid:
             return self.default
+        if self.dtype:
+            return self.dtype()
         attr = getattr(device, self.get_attribute_name())
         if attr.get_data_type() == PyTango.DevString:
             return str()
@@ -221,7 +227,7 @@ class event_property(object):
     def __set__(self, instance, value):
         return self.setter(instance, value)
 
-    def __del__(self, instance):
+    def __delete__(self, instance):
         return self.deleter(instance)
 
     # Access methods
@@ -242,7 +248,7 @@ class event_property(object):
         self.set_value(device, *self.check_value(*args))
 
     def deleter(self, device):
-        self.delete_all(device)
+        self.reloader(device)
 
     def reloader(self, device=None, reset=True):
         # Prevent class calls
@@ -250,7 +256,7 @@ class event_property(object):
             return
         # Delete attributes
         if reset:
-            self.deleter(device)
+            self.delete_all(device)
         # Set quality
         if not self.allowed(device):
             self.set_value(device, quality=self.INVALID,
@@ -268,7 +274,7 @@ class event_property(object):
             quality = self.get_private_quality(device)
         except AttributeError:
             value = self.get_default_value(device)
-            stamp = time()
+            stamp = time.time()
             quality = self.get_default_quality()
         return value, stamp, quality
 
@@ -279,7 +285,7 @@ class event_property(object):
         if value is None:
             value = old_value
         if stamp is None:
-            stamp = time()
+            stamp = time.time()
         if quality is None and value is not None:
             quality = self.VALID
         elif quality is None:
@@ -319,6 +325,10 @@ class event_property(object):
 class mapping(Mapping):
     """Mapping object to gather python attributes."""
 
+    def clear(self):
+        for x in self:
+            del self[x]
+
     def __init__(self, instance, convert, keys):
         self.keys = list(keys)
         self.convert = convert
@@ -333,6 +343,11 @@ class mapping(Mapping):
         if key not in self.keys:
             raise KeyError(key)
         setattr(self.instance, self.convert(key), value)
+
+    def __delitem__(self, key):
+        if key not in self.keys:
+            raise KeyError(key)
+        delattr(self.instance, self.convert(key))
 
     def __iter__(self):
         return iter(self.keys)

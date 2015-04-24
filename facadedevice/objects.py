@@ -3,7 +3,7 @@
 # Imports
 import time
 from PyTango.server import device_property, attribute, command
-from facadedevice.common import catch_key_error, event_property, mapping
+from facadedevice.common import event_property, mapping
 
 # Constants
 PREFIX = ''
@@ -69,20 +69,10 @@ class logical_attribute(class_object):
 
     def update_class(self, key, dct):
         """Create the attribute and read method."""
-        # Attribute
-        dct[key] = attribute(**self.kwargs)
-        dct[attr_data_name(key)] = event_property(key)
+        prop = event_property(key, dtype=self.dtype, event="use_events")
+        dct[attr_data_name(key)] = prop
+        dct[key] = attribute(fget=prop.read, **self.kwargs)
         dct["_class_dict"]["attributes"][key] = self
-
-        # Read method
-        def reader(device):
-            """Read the value from attribute dictionary."""
-            return getattr(device, attr_data_name(key))
-
-        # Set reader method
-        reader_name = 'read_' + key
-        reader.__name__ = reader_name
-        dct[reader_name] = catch_key_error(reader, self.dtype)
 
 
 # Proxy attribute object
