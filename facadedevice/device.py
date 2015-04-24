@@ -34,9 +34,12 @@ class Facade(Device):
         self._data_dict.clear()
         exc = str(exc) if str(exc) else repr(exc)
         form = lambda x: x[0].capitalize() + x[1:] if x else x
-        args = filter(None, [form(msg), form(exc)])
+        status = '\n'.join(filter(None, [form(msg), form(exc)]))
+        # State and status
+        self.set_status(status)
         self.set_state(DevState.FAULT)
-        self.set_status('\n'.join(args))
+        # Stream error
+        self.error_stream(status)
         self.debug_stream(traceback.format_exc().replace("%", "%%"))
 
     def get_device_properties(self, cls=None):
