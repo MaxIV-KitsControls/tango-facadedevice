@@ -19,6 +19,9 @@ class Facade(Device):
     """Provide base methods for a facade device."""
     __metaclass__ = DeviceMeta
 
+    # Disable use_events by default
+    use_events = False
+
     @contextmanager
     def safe_context(self, exceptions, msg=""):
         """Catch errors and set the device to FAULT
@@ -70,8 +73,8 @@ class Facade(Device):
         # Init attributes
         self._lock = Lock()
         self._tmp_dict = {}
-        self._exception = None
         self._proxy_dict = {}
+        self._exception = None
         self._device_dict = {}
         self._method_dict = {}
         self._command_dict = {}
@@ -92,12 +95,20 @@ class Facade(Device):
         self.update_all()
 
     def delete_device(self):
+        # Unsubscribe events
         for proxy, attrs in self._evented_attrs.items():
             for attr, eid in attrs.items():
                 try:
                     proxy.unsubscribe_event(eid)
                 except Exception as exc:
                     self.debug_stream(str(exc))
+        # Clear internal attributes
+        self._data_dict.clear()
+        # Disable events
+        try:
+            del self.use_events
+        except AttributeError:
+            pass
 
     def init_data_structure(self):
         """Initialize the internal data structures."""
