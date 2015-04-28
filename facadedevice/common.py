@@ -130,10 +130,16 @@ class event_property(object):
         except AttributeError:
             return self.attribute
 
+    def get_is_allowed_method(self, device):
+        if callable(self.is_allowed):
+            return self.is_allowed
+        if self.is_allowed:
+            return getattr(device, self.is_allowed)
+        name = "is_" + self.get_attribute_name() + "_allowed"
+        return getattr(device, name, None)
+
     def allowed(self, device):
-        is_allowed = self.is_allowed
-        if is_allowed and isinstance(is_allowed, basestring):
-            is_allowed = getattr(device, is_allowed)
+        is_allowed = self.get_is_allowed_method(device)
         return not is_allowed or is_allowed(AttReqType.READ_REQ)
 
     def event_enabled(self, device):
@@ -267,7 +273,7 @@ class event_property(object):
 
     # Private attribute access
 
-    def get_value(self, device):
+    def get_value(self, device, attr=None):
         try:
             value = self.get_private_value(device)
             stamp = self.get_private_stamp(device)
@@ -276,6 +282,8 @@ class event_property(object):
             value = self.get_default_value(device)
             stamp = time.time()
             quality = self.get_default_quality()
+        if attr:
+            attr.set_value_date_quality(value, stamp, quality)
         return value, stamp, quality
 
     def set_value(self, device, value=None, stamp=None, quality=None,
