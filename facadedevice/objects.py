@@ -17,7 +17,8 @@ def attr_data_name(key):
 
 # Attribute mapping
 def attribute_mapping(instance):
-    return mapping(instance, attr_data_name, instance._class_dict["attributes"])
+    keys = instance._class_dict["attributes"]
+    return mapping(instance, attr_data_name, keys)
 
 
 # Base class object
