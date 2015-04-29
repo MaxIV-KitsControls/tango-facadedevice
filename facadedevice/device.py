@@ -21,6 +21,17 @@ class Facade(Device):
 
     # Disable use_events by default
     use_events = False
+    update_period = 0
+
+    @property
+    def ensure_events(self):
+        """Events have to be used for all attributes."""
+        return self.use_events and self.update_period <= 0
+
+    @property
+    def limit_period(self):
+        """Limit the refresh rate for the remote update."""
+        return 0 if self.use_events else self.update_period
 
     @contextmanager
     def safe_context(self, exceptions, msg=""):
@@ -33,6 +44,7 @@ class Facade(Device):
             self.register_exception(exc, msg)
 
     def register_exception(self, exc, msg=""):
+        """Regsiter an exception and update the device properly."""
         self._exception = exc
         self._data_dict.clear()
         exc = str(exc) if str(exc) else repr(exc)
@@ -55,12 +67,13 @@ class Facade(Device):
     def configure_events(self):
         """Configure events and update period from property."""
         self.use_events = self.UseEvents
-        if self.use_events:
-            self.update_period = 0
-            ms = int(1000 * self.UpdatePeriod)
+        self.update_period = self.UpdatePeriod
+        # Poll update command
+        if self.use_events and not self.ensure_events:
+            ms = int(1000 * self.update_period)
             self.poll_command("Update", ms)
             return
-        self.update_period = self.UpdatePeriod
+        # Don't poll update command
         try:
             self.stop_poll_command("Update")
         except DevFailed as exc:
@@ -91,10 +104,11 @@ class Facade(Device):
             return
         # Data structure
         self.init_data_structure()
-        # First update
-        self.update_all()
+        # Connection
+        self.init_connection()
 
     def delete_device(self):
+        """Unsubscribe events and clear attributes values."""
         # Unsubscribe events
         for proxy, attrs in self._evented_attrs.items():
             for attr, eid in attrs.items():
@@ -131,8 +145,41 @@ class Facade(Device):
             self._command_dict[cmd] = (attr, value.value,
                                        value.reset_value, value.reset_delay)
 
-    def listen_to_attributes(self, proxy, attr_dict):
-        "Try to setup event listeners for the attributes on a proxy"
+    def init_connection(self):
+        """Initialize all connections."""
+        self.create_proxies()
+        self.update_all()
+        self.setup_listeners()
+
+    def create_proxies(self):
+        """Create the device proxies."""
+        # Connection error
+        if self._exception:
+            return
+        # Create proxies
+        msg = "Cannot connect to proxy."
+        with self.safe_context(DevFailed, msg):
+            # Connect to proxies
+            for device in self._device_dict.values():
+                if device not in self._proxy_dict:
+                    proxy = DeviceProxy(device)
+                    self._proxy_dict[device] = proxy
+                    self._evented_attrs[proxy] = {}
+
+    def setup_listeners(self):
+        """Try to setup listeners for all attributes."""
+        # Connection error
+        if self._exception:
+            return
+        # Setup listeners
+        msg = "Cannot subscribe to change event."
+        with self.safe_context(DevFailed, msg):
+            for device, attr_dict in self._read_dict.items():
+                proxy = self._proxy_dict[device]
+                self.setup_listener(proxy, attr_dict)
+
+    def setup_listener(self, proxy, attr_dict):
+        "Try to setup event listeners for all given attributes on a proxy"
         for attr, attr_proxy in attr_dict.items():
             try:
                 eid = proxy.subscribe_event(
@@ -142,6 +189,8 @@ class Facade(Device):
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
                 self.debug_stream(msg.format(proxy.dev_name(), attr))
+                if self.ensure_events:
+                    raise
             else:
                 self._evented_attrs[proxy][attr_proxy] = eid
                 msg = "Subscribed to change event for attribute {0}/{1}"
@@ -163,23 +212,15 @@ class Facade(Device):
         self._data_dict[attr] = event.attr_value
         self.local_update()
 
-    @cache_during("update_period", "debug_stream")
+    @cache_during("limit_period", "debug_stream")
     def remote_update(self):
         """Update the attributes by reading from the proxies."""
         # Connection error
         if self._exception:
             return
         # Try to access the proxy
-        new_proxies = set()
-        msg = "Cannot connect to proxy."
-        with self.safe_context((DevFailed), msg):
-            # Connect to proxies
-            for device in self._device_dict.values():
-                if device not in self._proxy_dict:
-                    proxy = DeviceProxy(device)
-                    new_proxies.add(proxy)
-                    self._proxy_dict[device] = proxy
-                    self._evented_attrs[proxy] = {}
+        msg = "Cannot read from proxy."
+        with self.safe_context(DevFailed, msg):
             # Read data
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
@@ -192,9 +233,6 @@ class Facade(Device):
                 # Store data
                 for attr, value in zip(polled, values):
                     self._data_dict[attr] = value
-                # Setup listeners
-                if proxy in new_proxies:
-                    self.listen_to_attributes(proxy, attr_dict)
 
     def local_update(self):
         """Update logical attributes, state and status."""
@@ -216,6 +254,9 @@ class Facade(Device):
 
     def update_all(self):
         """Update all."""
+        # Connection error
+        if self._exception:
+            return
         self.remote_update()
         self.local_update()
 
@@ -274,7 +315,7 @@ class Facade(Device):
     UpdatePeriod = device_property(
         dtype=float,
         doc="Set the refresh rate for polled attributes.",
-        default_value=1.0,
+        default_value=0.0,
         )
 
     UseEvents = device_property(
