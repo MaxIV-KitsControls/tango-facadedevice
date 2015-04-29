@@ -179,8 +179,8 @@ class event_property(object):
             except AttributeError:
                 pass
 
-    @classmethod
-    def unpack(cls, value):
+    @staticmethod
+    def unpack(value):
         try:
             value.stamp = value.time.totime()
         except AttributeError:
