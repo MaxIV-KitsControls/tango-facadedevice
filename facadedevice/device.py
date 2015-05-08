@@ -33,6 +33,11 @@ class Facade(Device):
         """Limit the refresh rate for the remote update."""
         return 0 if self.use_events else self.update_period
 
+    @property
+    def connected(self):
+        """Status of the connection with the proxies."""
+        return not self._exception
+
     @contextmanager
     def safe_context(self, exceptions, msg=""):
         """Catch errors and set the device to FAULT
@@ -148,7 +153,8 @@ class Facade(Device):
     def init_connection(self):
         """Initialize all connections."""
         self.create_proxies()
-        self.update_all()
+        self.remote_update(first_update=True)
+        self.local_update()
         self.setup_listeners()
 
     def create_proxies(self):
@@ -188,13 +194,13 @@ class Facade(Device):
                     partial(self.on_change_event, attr))
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
-                self.debug_stream(msg.format(proxy.dev_name(), attr))
+                self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
                 if self.ensure_events:
                     raise
             else:
                 self._evented_attrs[proxy][attr_proxy] = eid
                 msg = "Subscribed to change event for attribute {0}/{1}"
-                self.debug_stream(msg.format(proxy.dev_name(), attr))
+                self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
 
     def on_change_event(self, attr, event):
         "Handle attribute change events"
@@ -213,10 +219,10 @@ class Facade(Device):
         self.local_update()
 
     @cache_during("limit_period", "debug_stream")
-    def remote_update(self):
+    def remote_update(self, first_update=False):
         """Update the attributes by reading from the proxies."""
         # Connection error
-        if self._exception:
+        if not self.connected:
             return
         # Try to access the proxy
         msg = "Cannot read from proxy."
@@ -229,7 +235,10 @@ class Facade(Device):
                               for attr, attr_proxy in attr_dict.items()
                               if attr_proxy not in self._evented_attrs[proxy])
                 # Read attributes
-                values = polled and proxy.read_attributes(polled.values())
+                if first_update:
+                    values = [proxy.read_attribute(v) for v in polled.values()]
+                else:
+                    values = polled and proxy.read_attributes(polled.values())
                 # Store data
                 for attr, value in zip(polled, values):
                     self._data_dict[attr] = value
@@ -237,7 +246,7 @@ class Facade(Device):
     def local_update(self):
         """Update logical attributes, state and status."""
         # Connection error
-        if self._exception:
+        if not self.connected:
             return
         with self._lock:
             # Update data
@@ -255,7 +264,7 @@ class Facade(Device):
     def update_all(self):
         """Update all."""
         # Connection error
-        if self._exception:
+        if not self.connected:
             return
         self.remote_update()
         self.local_update()
@@ -341,6 +350,13 @@ def FacadeMeta(name, bases, dct):
     dct["_class_dict"] = {"attributes": {},
                           "commands":   {},
                           "devices":    {}}
+    # Inheritance
+    for base in reversed(bases):
+        try:
+            for key, value in dct["_class_dict"].items():
+                value.update(base._class_dict.get(key, {}))
+        except AttributeError:
+            continue
     # Proxy objects
     for key, value in dct.items():
         if isinstance(value, class_object):
