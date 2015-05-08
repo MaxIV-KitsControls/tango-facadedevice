@@ -279,7 +279,8 @@ class Facade(Device):
     @property
     def devices(self):
         """The proxy dictionary."""
-        return self._device_dict
+        return dict((key, self._proxy_dict[value])
+                    for key, value in self._device_dict.items())
 
     @property
     def attributes(self):
