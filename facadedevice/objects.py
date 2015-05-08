@@ -2,6 +2,7 @@
 
 # Imports
 import time
+from PyTango import AttrWriteType
 from PyTango.server import device_property, attribute, command
 from facadedevice.common import event_property, mapping
 
@@ -70,8 +71,10 @@ class logical_attribute(class_object):
 
     def update_class(self, key, dct):
         """Create the attribute and read method."""
+        # Property
         prop = event_property(key, dtype=self.dtype, event="use_events")
         dct[attr_data_name(key)] = prop
+        # Attribute
         dct[key] = attribute(fget=prop.read, **self.kwargs)
         dct["_class_dict"]["attributes"][key] = self
 
@@ -102,6 +105,20 @@ class proxy_attribute(logical_attribute, proxy):
         proxy.update_class(self, key, dct)
         # Create device property
         dct[self.attr] = device_property(dtype=str, doc=self.attr)
+        # Write type
+        write = self.kwargs.get("access") == AttrWriteType.READ_WRITE
+        write = write and not dct.get("is_" + key + "_allowed")
+        write = write and not set(self.kwargs) & set(["fwrite", "fset"])
+        if not write:
+            return
+        # Write method
+        def write(device, value):
+            proxy_name = device._device_dict[key]
+            device_proxy = device._proxy_dict[proxy_name]
+            proxy_attr = device._attribute_dict[key]
+            device_proxy.write_attribute(proxy_attr, value)
+        dct[key] = dct[key].setter(write)
+
 
 
 # Proxy command object
@@ -147,7 +164,8 @@ class proxy_command(proxy):
                 msg = "no attribute for {0} property."
                 raise ValueError(msg.format(self.attr))
             # Write
-            device_proxy = device._device_dict[key]
+            proxy_name = device._device_dict[key]
+            device_proxy = device._proxy_dict[proxy_name]
             device_proxy.write_attribute(attr, value)
             if reset_value is not None:
                 time.sleep(reset_delay / 1000.0)
