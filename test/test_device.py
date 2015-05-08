@@ -4,7 +4,7 @@
 from mock import Mock
 from PyTango.server import command
 from devicetest import DeviceTestCase
-from PyTango import DevState
+from PyTango import DevState, DevFailed
 
 # Proxy imports
 from facadedevice import Facade, FacadeMeta
@@ -47,11 +47,6 @@ class CameraScreen(Facade):
         attr="OutCmdTag",
         value=1)
 
-    # Property
-    @property
-    def connected(self):
-        return bool(self.data)
-
     # State
     def state_from_data(self, data):
         if data['Error']:
@@ -86,12 +81,12 @@ class ProxyTestCase(DeviceTestCase):
         # Mock DeviceProxy
         cls.DeviceProxy = proxy_module.DeviceProxy = Mock(name="DeviceProxy")
         cls.proxy = cls.DeviceProxy.return_value
-        cls.bool_attr = [Mock(value=False), Mock(value=True)]
-        cls.proxy.read_attributes.return_value = [cls.bool_attr[False]]*2
+        cls.proxy.read_attributes.return_value = [0, 0]
+        cls.proxy.subscribe_event.side_effect = DevFailed
 
     def test_attributes(self):
         # Expected values
-        tags = ['tag3', 'tag4']
+        tags = ['tag4', 'tag3']
         states = [[DevState.FAULT, DevState.EXTRACT],
                   [DevState.INSERT, DevState.FAULT]]
         status = [["Conflict", "OUT"], ["IN", "Conflict"]]
@@ -100,8 +95,7 @@ class ProxyTestCase(DeviceTestCase):
             # OutStatus in [False, True]
             for y in range(2):
                 # Perform tests
-                return_value = [self.bool_attr[x], self.bool_attr[y]]
-                self.proxy.read_attributes.return_value = return_value
+                self.proxy.read_attributes.return_value = [y, x]
                 self.assertEqual(self.device.StatusIn, x)
                 self.assertEqual(self.device.StatusOut, y)
                 self.assertEqual(self.device.Error, x == y)
