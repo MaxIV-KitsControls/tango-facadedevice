@@ -22,4 +22,5 @@ setup(name="tangods-facadedevice",
       url="http://www.maxlab.lu.se",
       long_description=safe_read("README.md"),
       packages=['facadedevice'],
+      test_suite="nose.collector",
       )
