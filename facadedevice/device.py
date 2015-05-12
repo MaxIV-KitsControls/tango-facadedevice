@@ -121,6 +121,8 @@ class Facade(Device):
                     proxy.unsubscribe_event(eid)
                 except Exception as exc:
                     self.debug_stream(str(exc))
+        # Clear cache from cache decorator
+        cache_during.cache.pop(self, None)
         # Clear internal attributes
         self._data_dict.clear()
         # Disable events
