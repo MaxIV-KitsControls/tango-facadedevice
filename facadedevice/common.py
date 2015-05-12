@@ -137,6 +137,8 @@ def cache_during(timeout_attr, debug_stream=None):
             cache[self] = queue, value
             # Return
             return value
+        # Create cache access
+        wrapper.pop_cache = lambda arg: cache.pop(arg, None)
         return wrapper
     return decorator
 

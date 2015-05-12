@@ -122,7 +122,7 @@ class Facade(Device):
                 except Exception as exc:
                     self.debug_stream(str(exc))
         # Clear cache from cache decorator
-        cache_during.cache.pop(self, None)
+        self.remote_update.pop_cache(self)
         # Clear internal attributes
         self._data_dict.clear()
         # Disable events
