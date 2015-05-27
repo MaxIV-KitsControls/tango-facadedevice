@@ -44,7 +44,7 @@ class proxy(class_object):
         if not self.device:
             self.device = key
         dct["_class_dict"]["devices"][key] = self
-        dct[self.device] = device_property(dtype=str, doc=self.device)
+        dct[self.device] = device_property(dtype=str, doc="Proxy device.")
 
 
 # Logical attribute object
@@ -104,13 +104,15 @@ class proxy_attribute(logical_attribute, proxy):
         logical_attribute.update_class(self, key, dct)
         proxy.update_class(self, key, dct)
         # Create device property
-        dct[self.attr] = device_property(dtype=str, doc=self.attr)
+        doc = "Attribute of {0} forwarded as {1}.".format(self.device, key)
+        dct[self.attr] = device_property(dtype=str, doc=doc)
         # Write type
         write = self.kwargs.get("access") == AttrWriteType.READ_WRITE
         write = write and not dct.get("is_" + key + "_allowed")
         write = write and not set(self.kwargs) & set(["fwrite", "fset"])
         if not write:
             return
+
         # Write method
         def write(device, value):
             proxy_name = device._device_dict[key]
@@ -118,7 +120,6 @@ class proxy_attribute(logical_attribute, proxy):
             proxy_attr = device._attribute_dict[key]
             device_proxy.write_attribute(proxy_attr, value)
         dct[key] = dct[key].setter(write)
-
 
 
 # Proxy command object
@@ -189,3 +190,18 @@ class proxy_command(proxy):
             dct[method_name] = is_allowed
         # Create properties
         dct[self.attr] = device_property(dtype=str, doc=self.attr)
+
+
+# Update docs function
+def update_docs(dct):
+    """Update the documentation for device properties."""
+    # Get attributes
+    attrs_dct = {}
+    for attr, value in dct["_class_dict"]["devices"].items():
+        if isinstance(value, proxy_attribute):
+            attrs_dct.setdefault(value.device, []).append(attr)
+    # Generate doc
+    for device, attrs in attrs_dct.items():
+        doc = 's ' + ', '.join(attrs[:-1]) + ' and ' if attrs[:-1] else ' '
+        doc = 'Proxy device for attribute{0}.'.format(doc + attrs[-1])
+        dct[device] = device_property(dtype=str, doc=doc)

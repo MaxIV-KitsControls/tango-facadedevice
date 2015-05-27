@@ -6,8 +6,8 @@ from threading import Lock
 from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
-from facadedevice.objects import class_object, attribute_mapping
 from facadedevice.common import DeviceMeta, cache_during
+from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
 from PyTango.server import Device, device_property, command
@@ -364,5 +364,7 @@ def FacadeMeta(name, bases, dct):
     for key, value in dct.items():
         if isinstance(value, class_object):
             value.update_class(key, dct)
+    # Update doc
+    update_docs(dct)
     # Create device class
     return DeviceMeta(name, bases, dct)
