@@ -340,6 +340,7 @@ class Facade(Device):
 
     @command
     def Update(self):
+        """Force the update of polled attributes."""
         self.update_all()
 
 

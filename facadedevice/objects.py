@@ -175,6 +175,8 @@ class proxy_command(proxy):
         # Set command
         cmd = command(**self.kwargs)
         run_command.__name__ = key
+        doc = "Write the attribute '{0}' of '{1}' with value {2}"
+        run_command.__doc__ = doc.format(self.attr, self.device, self.value)
         dct[key] = cmd(run_command)
 
         # Is allowed method
