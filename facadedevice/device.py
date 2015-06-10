@@ -6,7 +6,7 @@ from threading import Lock
 from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
-from facadedevice.common import DeviceMeta, cache_during
+from facadedevice.common import DeviceMeta, cache_during, read_attributes
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
@@ -155,7 +155,7 @@ class Facade(Device):
     def init_connection(self):
         """Initialize all connections."""
         self.create_proxies()
-        self.remote_update(first_update=True)
+        self.remote_update()
         self.local_update()
         self.setup_listeners()
 
@@ -208,20 +208,20 @@ class Facade(Device):
         "Handle attribute change events"
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
-            msg = "Not a data event:\n{0}"
-            self.warn_stream(msg.format(event))
+            msg = "Received an unexpected event."
+            self.register_exception(event, msg)
             return
         # Ignore the event if it contains an error
-        if event.err:
-            msg = "Event contains errors:\n{0}"
-            self.warn_stream(msg.format(event))
+        if event.errors:
+            msg = "Received an event that contains errors."
+            self.register_exception(event.errors[0].desc, msg)
             return
         # Save and update
         self._data_dict[attr] = event.attr_value
         self.local_update()
 
     @cache_during("limit_period", "debug_stream")
-    def remote_update(self, first_update=False):
+    def remote_update(self):
         """Update the attributes by reading from the proxies."""
         # Connection error
         if not self.connected:
@@ -237,10 +237,7 @@ class Facade(Device):
                               for attr, attr_proxy in attr_dict.items()
                               if attr_proxy not in self._evented_attrs[proxy])
                 # Read attributes
-                if first_update:
-                    values = [proxy.read_attribute(v) for v in polled.values()]
-                else:
-                    values = polled and proxy.read_attributes(polled.values())
+                values = polled and read_attributes(proxy, polled.values())
                 # Store data
                 for attr, value in zip(polled, values):
                     self._data_dict[attr] = value

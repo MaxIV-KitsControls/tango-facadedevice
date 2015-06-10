@@ -10,9 +10,27 @@ from weakref import WeakKeyDictionary
 from collections import Mapping, namedtuple
 from PyTango import AttrQuality, AttReqType, server
 
+# Constants
+ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
+
 # Stamped tuple
 _stamped = namedtuple("stamped", ("value", "stamp", "quality"))
 stamped = partial(_stamped, quality=AttrQuality.ATTR_VALID)
+
+
+# Read attributes helper
+def read_attributes(proxy, attributes):
+    """Modified version of DeviceProxy.read_attribute."""
+    result = proxy.read_attributes(attributes)
+    for attr, res in zip(attributes, result):
+        if not res.has_failed:
+            continue
+        try:
+            proxy.read_attribute(attr)
+        except PyTango.DevFailed as exc:
+            if exc[0].reason != ATTR_NOT_ALLOWED:
+                raise
+    return result
 
 
 # Tango objects
