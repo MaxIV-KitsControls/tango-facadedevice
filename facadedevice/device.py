@@ -39,28 +39,37 @@ class Facade(Device):
         return not self._exception
 
     @contextmanager
-    def safe_context(self, exceptions, msg=""):
-        """Catch errors and set the device to FAULT
-        with a corresponding status.
+    def safe_context(self, exceptions=Exception, msg="", ignore=False):
+        """Catch and handle errors.
+
+        Args:
+            exceptions (tuple list): exception to catch
+            msg (string): add a custom message
+            ignore (bool): don't stop the device
         """
         try:
             yield
         except exceptions as exc:
-            self.register_exception(exc, msg)
+            self.register_exception(exc, msg, ignore)
 
-    def register_exception(self, exc, msg=""):
+    def register_exception(self, exc, msg="", ignore=False):
         """Regsiter an exception and update the device properly."""
-        self._exception = exc
-        self._data_dict.clear()
+        # Format exception
         exc = str(exc) if str(exc) else repr(exc)
         form = lambda x: x[0].capitalize() + x[1:] if x else x
         status = '\n'.join(filter(None, [form(msg), form(exc)]))
-        # State and status
-        self.set_status(status)
-        self.set_state(DevState.FAULT)
         # Stream error
         self.error_stream(status)
         self.debug_stream(traceback.format_exc().replace("%", "%%"))
+        # Ignore exception
+        if ignore:
+            return status
+        # Set fault state
+        self._exception = exc
+        self._data_dict.clear()
+        self.set_status(status)
+        self.set_state(DevState.FAULT)
+        return status
 
     def get_device_properties(self, cls=None):
         """Raise a ValueError if a property is missing."""
@@ -251,13 +260,29 @@ class Facade(Device):
         with self._lock:
             # Update data
             for key, method in self._method_dict.items():
-                self._data_dict[key] = method(self._data_dict)
+                try:
+                    self._data_dict[key] = method(self._data_dict)
+                except Exception as exc:
+                    msg = "Error while updating attribute {0}.".format(key)
+                    self.register_exception(exc, msg, ignore=True)
+                    self._data_dict[key] = None
+            # Get state
+            try:
+                state = self.state_from_data(self._data_dict)
+            except Exception as exc:
+                msg = "Error while getting the device state."
+                self.register_exception(exc, msg)
+                return
             # Set state
-            state = self.state_from_data(self._data_dict)
             if state is not None:
                 self.set_state(state)
+            # Get status
+            try:
+                status = self.status_from_data(self._data_dict)
+            except Exception as exc:
+                msg = "Error while getting the device status."
+                status = self.register_exception(exc, msg, ignore=True)
             # Set status
-            status = self.status_from_data(self._data_dict)
             if status is not None:
                 self.set_status(status)
 
