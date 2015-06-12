@@ -4,7 +4,7 @@
 from mock import Mock
 from PyTango.server import command
 from devicetest import DeviceTestCase
-from PyTango import DevState, DevFailed
+from PyTango import DevState, DevFailed, AttrQuality
 
 # Proxy imports
 from facadedevice import Facade, FacadeMeta
@@ -79,9 +79,14 @@ class ProxyTestCase(DeviceTestCase):
     @classmethod
     def mocking(cls):
         # Mock DeviceProxy
+        cls.attrx, cls.attry = Mock(), Mock()
+        cls.attrx.value, cls.attry.value = 0, 0
+        cls.attrx.time.totime.return_value = 0
+        cls.attry.time.totime.return_value = 0
+        cls.attrx.quality, cls.attry.quality = (AttrQuality.ATTR_VALID,) * 2
         cls.DeviceProxy = proxy_module.DeviceProxy = Mock(name="DeviceProxy")
         cls.proxy = cls.DeviceProxy.return_value
-        cls.proxy.read_attributes.return_value = [0, 0]
+        cls.proxy.read_attributes.return_value = [cls.attry, cls.attrx]
         cls.proxy.subscribe_event.side_effect = DevFailed
 
     def test_attributes(self):
@@ -95,7 +100,7 @@ class ProxyTestCase(DeviceTestCase):
             # OutStatus in [False, True]
             for y in range(2):
                 # Perform tests
-                self.proxy.read_attributes.return_value = [y, x]
+                self.attrx.value, self.attry.value = x, y
                 self.assertEqual(self.device.StatusIn, x)
                 self.assertEqual(self.device.StatusOut, y)
                 self.assertEqual(self.device.Error, x == y)
