@@ -228,7 +228,8 @@ class Facade(Device):
             return
         # Try to access the proxy
         msg = "Cannot read from proxy."
-        with self.safe_context(DevFailed, msg):
+        errors = DevFailed, TypeError, ValueError
+        with self.safe_context(errors, msg):
             # Read data
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
