@@ -258,6 +258,12 @@ class Facade(Device):
         if not self.connected:
             return
         with self._lock:
+            # Safe update
+            try:
+                self.safe_update(self._data_dict)
+            except Exception as exc:
+                msg = "Error while running safe_update."
+                self.register_exception(exc, msg, ignore=True)
             # Update data
             for key, method in self._method_dict.items():
                 try:
@@ -285,6 +291,10 @@ class Facade(Device):
             # Set status
             if status is not None:
                 self.set_status(status)
+
+    def safe_update(self, data):
+        """Safe update to overrride."""
+        pass
 
     def update_all(self):
         """Update all."""
