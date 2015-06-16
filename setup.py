@@ -14,7 +14,7 @@ def safe_read(fname):
 
 # Setup
 setup(name="tangods-facadedevice",
-      version="0.2.9",
+      version="0.3.0",
       description="Provide a facade device to subclass.",
       author="Vincent Michel",
       author_email="vincent.michel@maxlab.lu.se",
