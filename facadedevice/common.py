@@ -175,12 +175,7 @@ class event_property(object):
         self.default = default
         self.invalid = invalid
         self.event = event
-        if callable(dtype):
-            self.dtype = dtype
-        elif isinstance(dtype, (tuple, list)):
-            self.dtype = tuple
-        else:
-            self.dtype = None
+        self.dtype = dtype if callable(dtype) else None
         self.__doc__ = doc
         default = getattr(attribute, "is_allowed_name", "")
         self.is_allowed = is_allowed or default
