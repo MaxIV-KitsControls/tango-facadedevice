@@ -259,8 +259,9 @@ class Facade(Device):
                 # Read attributes
                 values = polled and read_attributes(proxy, polled.values())
                 # Store data
-                for attr, value in zip(polled, values):
-                    self._data_dict[attr] = value
+                with self._lock:
+                    for attr, value in zip(polled, values):
+                        self._data_dict[attr] = value
 
     def local_update(self):
         """Update logical attributes, state and status."""
