@@ -13,7 +13,7 @@ def safe_read(fname):
         return ""
 
 # Setup
-setup(name="tangods-facadedevice",
+setup(name="python-facadedevice",
       version="0.3.0",
       description="Provide a facade device to subclass.",
       author="Vincent Michel",
