@@ -233,7 +233,8 @@ class Facade(Device):
             self.register_exception(event.errors[0].desc, msg)
             return
         # Save and update
-        self._data_dict[attr] = event.attr_value
+        with self._lock:
+            self._data_dict[attr] = event.attr_value
         self.local_update()
 
     @cache_during("limit_period", "debug_stream")
