@@ -179,7 +179,10 @@ class Facade(Device):
             # Connect to proxies
             for device in self._device_dict.values():
                 if device not in self._proxy_dict:
-                    proxy = DeviceProxy(device)
+                    if device.lower() == "none":
+                        proxy = None
+                    else:
+                        proxy = DeviceProxy(device)
                     self._proxy_dict[device] = proxy
                     self._evented_attrs[proxy] = {}
 
@@ -193,6 +196,10 @@ class Facade(Device):
         with self.safe_context(DevFailed, msg):
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
+                # Diasbled proxy
+                if not proxy:
+                    continue
+                # Setup listener
                 self.setup_listener(proxy, attr_dict)
 
     def setup_listener(self, proxy, attr_dict):
@@ -242,6 +249,9 @@ class Facade(Device):
             # Read data
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
+                # Diasbled proxy
+                if not proxy:
+                    continue
                 # Filter attribute dict
                 polled = dict((attr, attr_proxy)
                               for attr, attr_proxy in attr_dict.items()
