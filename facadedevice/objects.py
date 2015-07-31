@@ -88,13 +88,14 @@ class proxy_attribute(logical_attribute, proxy):
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, device, attr, **kwargs):
+    def __init__(self, device, attr, default_attr=None, **kwargs):
         """Initialize with the device property name, the attribute property
         name and the standard tango attribute keywords.
         """
         logical_attribute.__init__(self, **kwargs)
         proxy.__init__(self, device)
         self.attr = attr
+        self.default_attr = default_attr
 
     def update_class(self, key, dct):
         """Create properties, attribute and read method.
@@ -106,7 +107,8 @@ class proxy_attribute(logical_attribute, proxy):
         proxy.update_class(self, key, dct)
         # Create device property
         doc = "Attribute of {0} forwarded as {1}.".format(self.device, key)
-        dct[self.attr] = device_property(dtype=str, doc=doc)
+        dct[self.attr] = device_property(dtype=str, doc=doc,
+                                         default_value=self.default_attr)
         # Write type
         write = self.kwargs.get("access") == AttrWriteType.READ_WRITE
         write = write and not dct.get("is_" + key + "_allowed")
