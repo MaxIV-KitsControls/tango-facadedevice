@@ -122,4 +122,9 @@ class ProxyTestCase(DeviceTestCase):
         self.proxy.write_attribute.assert_called_with("tag2", 1)
         # Rest command
         self.device.Reset()
-        self.proxy.Reset.assert_called_once()
+        self.proxy.Reset.assert_called_once_with()
+        # Info command
+        expected = ("This device does not push change events.\n"
+                    "This device didn't subscribe to any event.\n"
+                    "This device doesn't use any caching to limit the calls the other devices.")
+        self.assertEqual(self.device.Info(), expected)
