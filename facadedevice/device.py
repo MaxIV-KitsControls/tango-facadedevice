@@ -19,19 +19,24 @@ class Facade(Device):
     """Provide base methods for a facade device."""
     __metaclass__ = DeviceMeta
 
-    # Disable use_events by default
-    use_events = False
+    # Disable push_events by default
+    push_events = False
     update_period = 0
 
     @property
     def ensure_events(self):
         """Events have to be used for all attributes."""
-        return self.use_events and self.update_period <= 0
+        return self.push_events and self.update_period <= 0
 
     @property
     def limit_period(self):
         """Limit the refresh rate for the remote update."""
-        return 0 if self.use_events else self.update_period
+        return 0 if self.push_events else self.update_period
+
+    @property
+    def poll_update_command(self):
+        """Poll the update command to refresh values."""
+        return self.push_events and not self.ensure_events
 
     @property
     def connected(self):
@@ -80,10 +85,10 @@ class Facade(Device):
 
     def configure_events(self):
         """Configure events and update period from property."""
-        self.use_events = self.UseEvents
+        self.push_events = self.PushEvents
         self.update_period = self.UpdatePeriod
         # Poll update command
-        if self.use_events and not self.ensure_events:
+        if self.poll_update_command:
             ms = int(1000 * self.update_period)
             self.poll_command("Update", ms)
             return
@@ -125,7 +130,7 @@ class Facade(Device):
         """Unsubscribe events and clear attributes values."""
         # Unsubscribe events
         for proxy, attrs in self._evented_attrs.items():
-            for attr, eid in attrs.items():
+            for attr, (key, eid) in attrs.items():
                 try:
                     proxy.unsubscribe_event(eid)
                 except Exception as exc:
@@ -136,7 +141,7 @@ class Facade(Device):
         self._data_dict.clear()
         # Disable events
         try:
-            del self.use_events
+            del self.push_events
         except AttributeError:
             pass
 
@@ -216,7 +221,7 @@ class Facade(Device):
                 if self.ensure_events:
                     raise
             else:
-                self._evented_attrs[proxy][attr_proxy] = eid
+                self._evented_attrs[proxy][attr_proxy] = attr, eid
                 msg = "Subscribed to change event for attribute {0}/{1}"
                 self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
 
@@ -358,12 +363,12 @@ class Facade(Device):
 
     def read_attr_hardware(self, attr):
         """Update attributes."""
-        if not self.use_events:
+        if not self.push_events:
             self.update_all()
 
     def dev_state(self):
         """Update attributes and return the state."""
-        if not self.use_events:
+        if not self.push_events:
             self.update_all()
         return Device.dev_state(self)
 
@@ -375,7 +380,7 @@ class Facade(Device):
         default_value=0.0,
         )
 
-    UseEvents = device_property(
+    PushEvents = device_property(
         dtype=bool,
         doc="Enable change events for all attributes.",
         default_value=False,
@@ -387,6 +392,47 @@ class Facade(Device):
     def Update(self):
         """Force the update of polled attributes."""
         self.update_all()
+
+    @command(
+        dtype_out=str,
+        doc_out="Information about polling and events."
+        )
+    def Info(self):
+        """Return information about polling and events."""
+        lines = []
+        # Event sending
+        if self.push_events:
+            lines.append("This device pushes change events.")
+        else:
+            lines.append("This device does not push change events.")
+        # Event subscription
+        if self.ensure_events:
+            lines.append("This device ensures the event subscribtion "
+                         "for all forwarded attributes.")
+        elif any(self._evented_attrs.values()):
+            lines.append("This device subscribed to change event "
+                         "for the following attributes:")
+            lines.extend("- {0}: {1}/{2}".format(key, proxy.dev_name(), attr)
+                         for proxy, dct in self._evented_attrs.items()
+                         for attr, (key, eid) in dct.items())
+        else:
+            lines.append("This device didn't subscribe to any event.")
+        # Polling and caching
+        if self.limit_period > 0:
+            line = ("This device limits the calls to other devices "
+                    "by caching the read values for {0:.3f} seconds.")
+            lines.append(line.format(self.limit_period))
+        elif self.poll_update_command:
+            line = ("This device refresh its contents by polling "
+                    "the update command every {0:.3f} seconds.")
+            lines.append(line.format(self.update_period))
+        elif self.use_events:
+            lines.append("This device doesn't rely on any polling.")
+        else:
+            lines.append("This device doesn't use any caching ",
+                         "to limit the calls the other devices.")
+        # Return result
+        return '\n'.join(lines)
 
 
 # Proxy metaclass
