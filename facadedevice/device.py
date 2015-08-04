@@ -426,7 +426,7 @@ class Facade(Device):
             line = ("This device refresh its contents by polling "
                     "the update command every {0:.3f} seconds.")
             lines.append(line.format(self.update_period))
-        elif self.use_events:
+        elif self.psuh_events:
             lines.append("This device doesn't rely on any polling.")
         else:
             lines.append("This device doesn't use any caching ",

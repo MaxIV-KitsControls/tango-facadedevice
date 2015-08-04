@@ -72,7 +72,7 @@ class logical_attribute(class_object):
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         # Property
-        prop = event_property(key, dtype=self.dtype, event="use_events",
+        prop = event_property(key, dtype=self.dtype, event="push_events",
                               is_allowed=self.kwargs.get("fisallowed"))
         dct[attr_data_name(key)] = prop
         # Attribute
