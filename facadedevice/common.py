@@ -7,7 +7,7 @@ import PyTango
 from collections import deque
 from functools import wraps, partial
 from weakref import WeakKeyDictionary
-from collections import Mapping, namedtuple
+from collections import MutableMapping, namedtuple
 from PyTango import AttrQuality, AttReqType, server
 
 # Constants
@@ -388,7 +388,7 @@ class event_property(object):
 
 
 # Mapping object
-class mapping(Mapping):
+class mapping(MutableMapping):
     """Mapping object to gather python attributes."""
 
     def clear(self):
@@ -396,30 +396,30 @@ class mapping(Mapping):
             del self[x]
 
     def __init__(self, instance, convert, keys):
-        self.keys = list(keys)
+        self.key_list = list(keys)
         self.convert = convert
         self.instance = instance
 
     def __getitem__(self, key):
-        if key not in self.keys:
+        if key not in self.key_list:
             raise KeyError(key)
         return getattr(self.instance, self.convert(key))
 
     def __setitem__(self, key, value):
-        if key not in self.keys:
+        if key not in self.key_list:
             raise KeyError(key)
         setattr(self.instance, self.convert(key), value)
 
     def __delitem__(self, key):
-        if key not in self.keys:
+        if key not in self.key_list:
             raise KeyError(key)
         delattr(self.instance, self.convert(key))
 
     def __iter__(self):
-        return iter(self.keys)
+        return iter(self.key_list)
 
     def __len__(self):
-        return len(self.keys)
+        return len(self.key_list)
 
     def __str__(self):
         return str(dict(self.items()))
