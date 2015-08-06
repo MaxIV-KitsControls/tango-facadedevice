@@ -87,6 +87,10 @@ class Facade(Device):
         """Configure events and update period from property."""
         self.push_events = self.PushEvents
         self.update_period = self.UpdatePeriod
+        # Enable push events for state and status
+        if self.push_events:
+            self.set_change_event('State', True, True)
+            self.set_change_event('Status', True, True)
         # Poll update command
         if self.poll_update_command:
             ms = int(1000 * self.update_period)
@@ -372,6 +376,20 @@ class Facade(Device):
             self.update_all()
         return Device.dev_state(self)
 
+    # Set state and status
+
+    def set_state(self, state):
+        """Set the state and push events if necessary."""
+        Device.set_state(self, state)
+        if self.push_events:
+            self.push_change_event('State')
+
+    def set_status(self, status):
+        """Set the status and push events if necessary."""
+        Device.set_status(self, status)
+        if self.push_events:
+            self.push_change_event('Status')
+
     # Device properties
 
     UpdatePeriod = device_property(
@@ -397,7 +415,7 @@ class Facade(Device):
         dtype_out=str,
         doc_out="Information about polling and events."
         )
-    def Info(self):
+    def GetInfo(self):
         """Return information about polling and events."""
         lines = []
         # Event sending
