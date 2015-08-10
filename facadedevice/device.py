@@ -159,6 +159,8 @@ class Facade(Device):
         for attr, value in sorted(self._class_dict["attributes"].items()):
             if value.attr and value.device:
                 proxy_attr = getattr(self, value.attr)
+                if proxy_attr.lower() == "none":
+                    continue
                 proxy_name = getattr(self, value.device)
                 self._attribute_dict[attr] = proxy_attr
                 self._read_dict[proxy_name][attr] = proxy_attr
