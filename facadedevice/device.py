@@ -159,7 +159,7 @@ class Facade(Device):
         for attr, value in sorted(self._class_dict["attributes"].items()):
             if value.attr and value.device:
                 proxy_attr = getattr(self, value.attr)
-                if proxy_attr.lower() == "none":
+                if proxy_attr.strip().lower() == "none":
                     continue
                 proxy_name = getattr(self, value.device)
                 self._attribute_dict[attr] = proxy_attr
@@ -190,7 +190,7 @@ class Facade(Device):
             # Connect to proxies
             for device in self._device_dict.values():
                 if device not in self._proxy_dict:
-                    if device.lower() == "none":
+                    if device.strip().lower() == "none":
                         proxy = None
                     else:
                         proxy = DeviceProxy(device)
