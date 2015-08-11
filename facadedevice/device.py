@@ -41,7 +41,7 @@ class Facade(Device):
     @property
     def connected(self):
         """Status of the connection with the proxies."""
-        return not self._exception
+        return not self._exception_origins
 
     @contextmanager
     def safe_context(self, exceptions=Exception, msg="", ignore=False):
@@ -57,8 +57,9 @@ class Facade(Device):
         except exceptions as exc:
             self.register_exception(exc, msg, ignore)
 
-    def register_exception(self, exc, msg="", ignore=False):
+    def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
+        origin = origin or exc
         # Format exception
         exc = str(exc) if str(exc) else repr(exc)
         form = lambda x: x[0].capitalize() + x[1:] if x else x
@@ -70,11 +71,15 @@ class Facade(Device):
         if ignore:
             return status
         # Set fault state
-        self._exception = exc
+        self._exception_origins.add(origin)
         self._data_dict.clear()
         self.set_status(status)
         self.set_state(DevState.FAULT)
         return status
+
+    def recover_from(self, origin):
+        """Recover from an error caused by the given origin."""
+        self._exception_origins.discard(origin)
 
     def get_device_properties(self, cls=None):
         """Raise a ValueError if a property is missing."""
@@ -110,12 +115,12 @@ class Facade(Device):
         self._lock = Lock()
         self._tmp_dict = {}
         self._proxy_dict = {}
-        self._exception = None
         self._device_dict = {}
         self._method_dict = {}
         self._command_dict = {}
         self._evented_attrs = {}
         self._attribute_dict = {}
+        self._exception_origins = set()
         self._read_dict = defaultdict(dict)
         self._data_dict = attribute_mapping(self)
         # Handle properties
@@ -182,7 +187,7 @@ class Facade(Device):
     def create_proxies(self):
         """Create the device proxies."""
         # Connection error
-        if self._exception:
+        if self._exception_origins:
             return
         # Create proxies
         msg = "Cannot connect to proxy."
@@ -200,7 +205,7 @@ class Facade(Device):
     def setup_listeners(self):
         """Try to setup listeners for all attributes."""
         # Connection error
-        if self._exception:
+        if self._exception_origins:
             return
         # Setup listeners
         msg = "Cannot subscribe to change event."
@@ -240,9 +245,12 @@ class Facade(Device):
             return
         # Ignore the event if it contains an error
         if event.errors:
+            exc = event.errors[0].desc
             msg = "Received an event that contains errors."
-            self.register_exception(event.errors[0].desc, msg)
+            self.register_exception(exc, msg, origin=attr)
             return
+        # Recover if needed
+        self.recover_from(attr)
         # Save and update
         with self._lock:
             self._data_dict[attr] = event.attr_value
