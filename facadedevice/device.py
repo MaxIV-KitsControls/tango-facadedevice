@@ -23,6 +23,8 @@ class Facade(Device):
     push_events = False
     update_period = 0
 
+    # Helpers
+
     @property
     def ensure_events(self):
         """Events have to be used for all attributes."""
@@ -55,23 +57,31 @@ class Facade(Device):
         try:
             yield
         except exceptions as exc:
+            if isinstance(exc, DevFailed):
+                exc = exc.args[0]
             self.register_exception(exc, msg, ignore)
+
+    # Exception handling
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
-        origin = origin or exc
         # Format exception
-        exc = str(exc) if str(exc) else repr(exc)
-        form = lambda x: x[0].capitalize() + x[1:] if x else x
+        try:
+            exc = exc.desc
+        except AttributeError:
+            exc = str(exc) if str(exc) else repr(exc)
+        form = lambda x: x.capitalize() if x else x
         status = '\n'.join(filter(None, [form(msg), form(exc)]))
         # Stream error
         self.error_stream(status)
         self.debug_stream(traceback.format_exc().replace("%", "%%"))
+        # Save in history
+        self._exception_history[status] += 1
         # Ignore exception
         if ignore:
             return status
         # Set fault state
-        self._exception_origins.add(origin)
+        self._exception_origins.add(origin or exc)
         self._data_dict.clear()
         self.set_status(status)
         self.set_state(DevState.FAULT)
@@ -87,6 +97,30 @@ class Facade(Device):
         for key, value in self.device_property_list.items():
             if value[2] is None:
                 raise ValueError('missing property: ' + key)
+
+    # Events handling
+
+    def on_change_event(self, attr, event):
+        "Handle attribute change events"
+        # Ignore the event if not a data event
+        if not isinstance(event, EventData):
+            msg = "Received an unexpected event."
+            self.register_exception(event, msg)
+            return
+        # Ignore the event if it contains an error
+        if event.errors:
+            exc = event.errors[0]
+            attr_name = '/'.join(event.attr_name.split('/')[-4:])
+            template = "Received an event from {0} that contains errors."
+            msg = template.format(attr_name)
+            self.register_exception(exc, msg, origin=attr)
+            return
+        # Recover if needed
+        self.recover_from(attr)
+        # Save and update
+        with self._lock:
+            self._data_dict[attr] = event.attr_value
+        self.local_update()
 
     def configure_events(self):
         """Configure events and update period from property."""
@@ -107,6 +141,8 @@ class Facade(Device):
         except DevFailed as exc:
             self.debug_stream(str(exc))
 
+    # Initialization
+
     def init_device(self):
         """Initialize the device."""
         # Initialize state
@@ -123,6 +159,7 @@ class Facade(Device):
         self._exception_origins = set()
         self._read_dict = defaultdict(dict)
         self._data_dict = attribute_mapping(self)
+        self._exception_history = defaultdict(int)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
             self.get_device_properties()
@@ -144,6 +181,10 @@ class Facade(Device):
                     proxy.unsubscribe_event(eid)
                 except Exception as exc:
                     self.debug_stream(str(exc))
+                else:
+                    msg = "Unsubscribed from change event for attribute"
+                    msg += " {0}/{1}".format(proxy.dev_name(), attr)
+                    self.debug_stream(msg)
         # Clear cache from cache decorator
         self.remote_update.pop_cache(self)
         # Clear internal attributes
@@ -202,6 +243,8 @@ class Facade(Device):
                     self._proxy_dict[device] = proxy
                     self._evented_attrs[proxy] = {}
 
+    # Setup listeners
+
     def setup_listeners(self):
         """Try to setup listeners for all attributes."""
         # Connection error
@@ -236,25 +279,7 @@ class Facade(Device):
                 msg = "Subscribed to change event for attribute {0}/{1}"
                 self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
 
-    def on_change_event(self, attr, event):
-        "Handle attribute change events"
-        # Ignore the event if not a data event
-        if not isinstance(event, EventData):
-            msg = "Received an unexpected event."
-            self.register_exception(event, msg)
-            return
-        # Ignore the event if it contains an error
-        if event.errors:
-            exc = event.errors[0].desc
-            msg = "Received an event that contains errors."
-            self.register_exception(exc, msg, origin=attr)
-            return
-        # Recover if needed
-        self.recover_from(attr)
-        # Save and update
-        with self._lock:
-            self._data_dict[attr] = event.attr_value
-        self.local_update()
+    # Update methods
 
     @cache_during("limit_period", "debug_stream")
     def remote_update(self):
@@ -459,6 +484,15 @@ class Facade(Device):
         else:
             lines.append("This device doesn't use any caching "
                          "to limit the calls the other devices.")
+        # Exception history
+        if self._exception_history:
+            lines.append("Error history:")
+            for key, value in self._exception_history.items():
+                string = 'once' if value == 1 else '{0} times'.format(value)
+                lines.append(' - Raised {0}:'.format(string))
+                lines.extend(' ' * 4 + line for line in key.split('\n'))
+        else:
+            lines.append("No errors in the history.")
         # Return result
         return '\n'.join(lines)
 
