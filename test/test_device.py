@@ -124,7 +124,10 @@ class ProxyTestCase(DeviceTestCase):
         self.device.Reset()
         self.proxy.Reset.assert_called_once_with()
         # Info command
-        expected = ("This device does not push change events.\n"
-                    "This device didn't subscribe to any event.\n"
-                    "This device doesn't use any caching to limit the calls the other devices.")
-        self.assertEqual(self.device.Info(), expected)
+        expected = """\
+This device does not push change events.
+This device didn't subscribe to any event.
+This device doesn't use any caching to limit the calls the other devices.
+No errors in the history.
+"""
+        self.assertEqual(self.device.GetInfo(), expected.strip())
