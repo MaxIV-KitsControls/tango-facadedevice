@@ -145,11 +145,11 @@ class Facade(Device):
 
     def init_device(self):
         """Initialize the device."""
-        # Initialize state
-        self.set_state(DevState.INIT)
         # Init locks
         self._internal_lock = Lock()
         self._callback_lock = RLock()
+        # Initialize state
+        self.set_state(DevState.INIT)
         # Init mappings
         self._tmp_dict = {}
         self._proxy_dict = {}
