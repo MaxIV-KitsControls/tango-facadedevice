@@ -4,6 +4,7 @@
 import sys
 import time
 import PyTango
+from threading import RLock
 from collections import deque
 from functools import wraps, partial
 from weakref import WeakKeyDictionary
@@ -171,6 +172,8 @@ class event_property(object):
 
     def __init__(self, attribute, default=None, invalid=None,
                  is_allowed=None, event=True, dtype=None, doc=None):
+        self.interface_lock = RLock()
+        self.internal_lock = RLock()
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
@@ -297,80 +300,86 @@ class event_property(object):
     # Access methods
 
     def getter(self, device):
-        if not self.allowed(device):
-            self.set_value(device, quality=self.INVALID)
-        value, stamp, quality = self.get_value(device)
-        if quality == self.INVALID:
-            return self.invalid
-        return value
+        with self.interface_lock:
+            if not self.allowed(device):
+                self.set_value(device, quality=self.INVALID)
+            value, stamp, quality = self.get_value(device)
+            if quality == self.INVALID:
+                return self.invalid
+            return value
 
     def setter(self, device, value):
-        value, stamp, quality = self.unpack(value)
-        if not self.allowed(device):
-            quality = self.INVALID
-        args = device, value, stamp, quality
-        self.set_value(device, *self.check_value(*args))
+        with self.interface_lock:
+            value, stamp, quality = self.unpack(value)
+            if not self.allowed(device):
+                quality = self.INVALID
+            args = device, value, stamp, quality
+            self.set_value(device, *self.check_value(*args))
 
     def deleter(self, device):
-        self.reloader(device)
+        with self.interface_lock:
+            self.reloader(device)
 
     def reloader(self, device=None, reset=True):
-        # Prevent class calls
-        if device is None:
-            return
-        # Delete attributes
-        if reset:
-            self.delete_all(device)
-        # Set quality
-        if not self.allowed(device):
-            self.set_value(device, quality=self.INVALID,
-                           disable_event=reset)
-        # Force events
-        if reset and self.event_enabled(device):
-            self.push_event(device, *self.get_value(device))
+        with self.interface_lock:
+            # Prevent class calls
+            if device is None:
+                return
+            # Delete attributes
+            if reset:
+                self.delete_all(device)
+            # Set quality
+            if not self.allowed(device):
+                self.set_value(device, quality=self.INVALID,
+                               disable_event=reset)
+            # Force events
+            if reset and self.event_enabled(device):
+                self.push_event(device, *self.get_value(device))
 
     # Private attribute access
 
     def get_value(self, device, attr=None):
-        try:
-            value = self.get_private_value(device)
-            stamp = self.get_private_stamp(device)
-            quality = self.get_private_quality(device)
-        except AttributeError:
-            value = self.get_default_value(device)
-            stamp = time.time()
-            quality = self.get_default_quality()
-        if attr:
-            attr.set_value_date_quality(value, stamp, quality)
-        return value, stamp, quality
+        with self.internal_lock:
+            try:
+                value = self.get_private_value(device)
+                stamp = self.get_private_stamp(device)
+                quality = self.get_private_quality(device)
+            except AttributeError:
+                value = self.get_default_value(device)
+                stamp = time.time()
+                quality = self.get_default_quality()
+            if attr:
+                attr.set_value_date_quality(value, stamp, quality)
+            return value, stamp, quality
 
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
-        # Prepare
-        old_value, old_stamp, old_quality = self.get_value(device)
-        if value is None:
-            value = old_value
-        if stamp is None:
-            stamp = time.time()
-        if quality is None and value is not None:
-            quality = self.VALID
-        elif quality is None:
-            quality = old_quality
-        # Test differences
-        diff = old_quality != quality or old_value != value
-        try:
-            bool(diff)
-        except ValueError:
-            diff = diff.any()
-        if not diff:
-            return
-        # Set
-        self.set_private_value(device, value)
-        self.set_private_stamp(device, stamp)
-        self.set_private_quality(device, quality)
-        # Push event
-        if not disable_event and self.event_enabled(device):
-            self.push_event(device, *self.get_value(device))
+        with self.internal_lock:
+            # Prepare
+            old_value, old_stamp, old_quality = self.get_value(device)
+            if value is None:
+                value = old_value
+            if stamp is None:
+                stamp = time.time()
+            if quality is None and value is not None:
+                quality = self.VALID
+            elif quality is None:
+                quality = old_quality
+            # Test differences
+            diff = old_quality != quality or old_value != value
+            try:
+                bool(diff)
+            except ValueError:
+                diff = diff.any()
+            if not diff:
+                return
+            # Set
+            self.set_private_value(device, value)
+            self.set_private_stamp(device, stamp)
+            self.set_private_quality(device, quality)
+            # Push event
+            if not disable_event and self.event_enabled(device):
+                self.push_event(device, *self.get_value(device))
 
     # Aliases
 

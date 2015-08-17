@@ -2,8 +2,8 @@
 
 # Imports
 import traceback
-from threading import Lock
 from functools import partial
+from threading import Lock, RLock
 from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import DeviceMeta, cache_during, read_attributes
@@ -65,27 +65,28 @@ class Facade(Device):
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
-        # Format exception
-        try:
-            exc = exc.desc
-        except AttributeError:
-            exc = str(exc) if str(exc) else repr(exc)
-        form = lambda x: x.capitalize() if x else x
-        status = '\n'.join(filter(None, [form(msg), form(exc)]))
-        # Stream error
-        self.error_stream(status)
-        self.debug_stream(traceback.format_exc().replace("%", "%%"))
-        # Save in history
-        self._exception_history[status] += 1
-        # Ignore exception
-        if ignore:
+        with self._callback_lock:
+            # Format exception
+            try:
+                exc = exc.desc
+            except AttributeError:
+                exc = str(exc) if str(exc) else repr(exc)
+            form = lambda x: x.capitalize() if x else x
+            status = '\n'.join(filter(None, [form(msg), form(exc)]))
+            # Stream error
+            self.error_stream(status)
+            self.debug_stream(traceback.format_exc().replace("%", "%%"))
+            # Save in history
+            self._exception_history[status] += 1
+            # Ignore exception
+            if ignore:
+                return status
+            # Set fault state
+            self._exception_origins.add(origin or exc)
+            self._data_dict.clear()
+            self.set_status(status)
+            self.set_state(DevState.FAULT)
             return status
-        # Set fault state
-        self._exception_origins.add(origin or exc)
-        self._data_dict.clear()
-        self.set_status(status)
-        self.set_state(DevState.FAULT)
-        return status
 
     def recover_from(self, origin):
         """Recover from an error caused by the given origin."""
@@ -118,8 +119,7 @@ class Facade(Device):
         # Recover if needed
         self.recover_from(attr)
         # Save and update
-        with self._lock:
-            self._data_dict[attr] = event.attr_value
+        self._data_dict[attr] = event.attr_value
         self.local_update()
 
     def configure_events(self):
@@ -147,8 +147,10 @@ class Facade(Device):
         """Initialize the device."""
         # Initialize state
         self.set_state(DevState.INIT)
-        # Init attributes
-        self._lock = Lock()
+        # Init locks
+        self._internal_lock = Lock()
+        self._callback_lock = RLock()
+        # Init mappings
         self._tmp_dict = {}
         self._proxy_dict = {}
         self._device_dict = {}
@@ -156,9 +158,10 @@ class Facade(Device):
         self._command_dict = {}
         self._evented_attrs = {}
         self._attribute_dict = {}
-        self._exception_origins = set()
         self._read_dict = defaultdict(dict)
         self._data_dict = attribute_mapping(self)
+        # Init exception data structure
+        self._exception_origins = set()
         self._exception_history = defaultdict(int)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
@@ -304,16 +307,15 @@ class Facade(Device):
                 # Read attributes
                 values = polled and read_attributes(proxy, polled.values())
                 # Store data
-                with self._lock:
-                    for attr, value in zip(polled, values):
-                        self._data_dict[attr] = value
+                for attr, value in zip(polled, values):
+                    self._data_dict[attr] = value
 
     def local_update(self):
         """Update logical attributes, state and status."""
-        # Connection error
-        if not self.connected:
-            return
-        with self._lock:
+        with self._callback_lock:
+            # Connection error
+            if not self.connected:
+                return
             # Safe update
             try:
                 self.safe_update(self._data_dict)
@@ -411,19 +413,26 @@ class Facade(Device):
             self.update_all()
         return Device.dev_state(self)
 
-    # Set state and status
+    # State, status and lock
 
     def set_state(self, state):
         """Set the state and push events if necessary."""
-        Device.set_state(self, state)
+        with self._internal_lock:
+            Device.set_state(self, state)
         if self.push_events:
             self.push_change_event('State')
 
     def set_status(self, status):
         """Set the status and push events if necessary."""
-        Device.set_status(self, status)
+        with self._internal_lock:
+            Device.set_status(self, status)
         if self.push_events:
             self.push_change_event('Status')
+
+    def push_change_event(self, *args, **kwargs):
+        """Lock the calls to push change events."""
+        with self._internal_lock:
+            Device.push_change_event(self, *args, **kwargs)
 
     # Device properties
 
