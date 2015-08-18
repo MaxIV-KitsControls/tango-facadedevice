@@ -172,8 +172,7 @@ class event_property(object):
 
     def __init__(self, attribute, default=None, invalid=None,
                  is_allowed=None, event=True, dtype=None, doc=None):
-        self.interface_lock = RLock()
-        self.internal_lock = RLock()
+        self.lock = RLock()
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
@@ -300,46 +299,42 @@ class event_property(object):
     # Access methods
 
     def getter(self, device):
-        with self.interface_lock:
-            if not self.allowed(device):
-                self.set_value(device, quality=self.INVALID)
-            value, stamp, quality = self.get_value(device)
-            if quality == self.INVALID:
-                return self.invalid
-            return value
+        if not self.allowed(device):
+            self.set_value(device, quality=self.INVALID)
+        value, stamp, quality = self.get_value(device)
+        if quality == self.INVALID:
+            return self.invalid
+        return value
 
     def setter(self, device, value):
-        with self.interface_lock:
-            value, stamp, quality = self.unpack(value)
-            if not self.allowed(device):
-                quality = self.INVALID
-            args = device, value, stamp, quality
-            self.set_value(device, *self.check_value(*args))
+        value, stamp, quality = self.unpack(value)
+        if not self.allowed(device):
+            quality = self.INVALID
+        args = device, value, stamp, quality
+        self.set_value(device, *self.check_value(*args))
 
     def deleter(self, device):
-        with self.interface_lock:
-            self.reloader(device)
+        self.reloader(device)
 
     def reloader(self, device=None, reset=True):
-        with self.interface_lock:
-            # Prevent class calls
-            if device is None:
-                return
-            # Delete attributes
-            if reset:
-                self.delete_all(device)
-            # Set quality
-            if not self.allowed(device):
-                self.set_value(device, quality=self.INVALID,
-                               disable_event=reset)
-            # Force events
-            if reset and self.event_enabled(device):
-                self.push_event(device, *self.get_value(device))
+        # Prevent class calls
+        if device is None:
+            return
+        # Delete attributes
+        if reset:
+            self.delete_all(device)
+        # Set quality
+        if not self.allowed(device):
+            self.set_value(device, quality=self.INVALID,
+                           disable_event=reset)
+        # Force events
+        if reset and self.event_enabled(device):
+            self.push_event(device, *self.get_value(device))
 
     # Private attribute access
 
     def get_value(self, device, attr=None):
-        with self.internal_lock:
+        with self.lock:
             try:
                 value = self.get_private_value(device)
                 stamp = self.get_private_stamp(device)
@@ -354,7 +349,7 @@ class event_property(object):
 
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
-        with self.internal_lock:
+        with self.lock:
             # Prepare
             old_value, old_stamp, old_quality = self.get_value(device)
             if value is None:
