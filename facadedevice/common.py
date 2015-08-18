@@ -372,9 +372,9 @@ class event_property(object):
             self.set_private_value(device, value)
             self.set_private_stamp(device, stamp)
             self.set_private_quality(device, quality)
-            # Push event
-            if not disable_event and self.event_enabled(device):
-                self.push_event(device, *self.get_value(device))
+        # Push event
+        if not disable_event and self.event_enabled(device):
+            self.push_event(device, *self.get_value(device))
 
     # Aliases
 

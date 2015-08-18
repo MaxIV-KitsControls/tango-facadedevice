@@ -2,8 +2,8 @@
 
 # Imports
 import traceback
+from threading import Lock
 from functools import partial
-from threading import Lock, RLock
 from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import DeviceMeta, cache_during, read_attributes
@@ -45,6 +45,29 @@ class Facade(Device):
         """Status of the connection with the proxies."""
         return not self._exception_origins
 
+    @property
+    def require_attribute_polling(self):
+        """True if at least one attributes require polling."""
+        return any(self.polled_attributes)
+
+    @property
+    def polled_attributes(self):
+        """List polled attributes as (local name, proxy name)."""
+        for device, attr_dict in self._read_dict.items():
+            proxy = self._proxy_dict[device]
+            for attr, attr_proxy in attr_dict.items():
+                if attr_proxy not in self._evented_attrs[proxy]:
+                    attr_name = proxy.dev_name() + '/' + attr_proxy
+                    yield attr, attr_name
+
+    @property
+    def evented_attributes(self):
+        """List evented attributes as (local name, proxy name)."""
+        for proxy, dct in self._evented_attrs.items():
+            for attr_proxy, (attr, eid) in dct.items():
+                attr_name = proxy.dev_name() + '/' + attr_proxy
+                yield attr, attr_name
+
     @contextmanager
     def safe_context(self, exceptions=Exception, msg="", ignore=False):
         """Catch and handle errors.
@@ -65,28 +88,31 @@ class Facade(Device):
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
-        with self._callback_lock:
-            # Format exception
-            try:
-                exc = exc.desc
-            except AttributeError:
-                exc = str(exc) if str(exc) else repr(exc)
-            form = lambda x: x.capitalize() if x else x
-            status = '\n'.join(filter(None, [form(msg), form(exc)]))
-            # Stream error
-            self.error_stream(status)
-            self.debug_stream(traceback.format_exc().replace("%", "%%"))
-            # Save in history
-            self._exception_history[status] += 1
-            # Ignore exception
-            if ignore:
-                return status
-            # Set fault state
-            self._exception_origins.add(origin or exc)
-            self._data_dict.clear()
-            self.set_status(status)
-            self.set_state(DevState.FAULT)
+        # Stream traceback
+        self.debug_stream(traceback.format_exc().replace("%", "%%"))
+        # Exception as a string
+        try:
+            exc = exc.desc
+        except AttributeError:
+            exc = str(exc) if str(exc) else repr(exc)
+        # Format status
+        form = lambda x: x.capitalize() if x else x
+        status = '\n'.join(filter(None, [form(msg), form(exc)]))
+        # Stream error
+        self.error_stream(status)
+        # Save in history
+        self._exception_history[status] += 1
+        # Ignore exception
+        if ignore:
             return status
+        # Lock state and status by registering an exception
+        self._exception_origins.add(origin or exc)
+        # Safely set state and status
+        self.set_status(status, force=True)
+        self.set_state(DevState.FAULT, force=True)
+        # Clear data dict
+        self._data_dict.clear()
+        return status
 
     def recover_from(self, origin):
         """Recover from an error caused by the given origin."""
@@ -118,8 +144,11 @@ class Facade(Device):
             return
         # Recover if needed
         self.recover_from(attr)
-        # Save and update
-        self._data_dict[attr] = event.attr_value
+        # Save
+        msg = "Error while saving event value for attribute {0}"
+        with self.safe_context(msg=msg.format(attr), ignore=True):
+            self._data_dict[attr] = event.attr_value
+        # Update
         self.local_update()
 
     def configure_events(self):
@@ -145,9 +174,10 @@ class Facade(Device):
 
     def init_device(self):
         """Initialize the device."""
-        # Init locks
-        self._internal_lock = Lock()
-        self._callback_lock = RLock()
+        # Init exception data structure
+        self._exception_lock = Lock()
+        self._exception_origins = set()
+        self._exception_history = defaultdict(int)
         # Initialize state
         self.set_state(DevState.INIT)
         # Init mappings
@@ -160,9 +190,6 @@ class Facade(Device):
         self._attribute_dict = {}
         self._read_dict = defaultdict(dict)
         self._data_dict = attribute_mapping(self)
-        # Init exception data structure
-        self._exception_origins = set()
-        self._exception_history = defaultdict(int)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
             self.get_device_properties()
@@ -297,7 +324,7 @@ class Facade(Device):
             # Read data
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
-                # Diasbled proxy
+                # Disabled proxy
                 if not proxy:
                     continue
                 # Filter attribute dict
@@ -312,43 +339,42 @@ class Facade(Device):
 
     def local_update(self):
         """Update logical attributes, state and status."""
-        with self._callback_lock:
-            # Connection error
-            if not self.connected:
-                return
-            # Safe update
+        # Connection error
+        if not self.connected:
+            return
+        # Safe update
+        try:
+            self.safe_update(self._data_dict)
+        except Exception as exc:
+            msg = "Error while running safe_update."
+            self.register_exception(exc, msg, ignore=True)
+        # Update data
+        for key, method in self._method_dict.items():
             try:
-                self.safe_update(self._data_dict)
+                self._data_dict[key] = method(self._data_dict)
             except Exception as exc:
-                msg = "Error while running safe_update."
+                msg = "Error while updating attribute {0}.".format(key)
                 self.register_exception(exc, msg, ignore=True)
-            # Update data
-            for key, method in self._method_dict.items():
-                try:
-                    self._data_dict[key] = method(self._data_dict)
-                except Exception as exc:
-                    msg = "Error while updating attribute {0}.".format(key)
-                    self.register_exception(exc, msg, ignore=True)
-                    self._data_dict[key] = None
-            # Get state
-            try:
-                state = self.state_from_data(self._data_dict)
-            except Exception as exc:
-                msg = "Error while getting the device state."
-                self.register_exception(exc, msg)
-                return
-            # Set state
-            if state is not None:
-                self.set_state(state)
-            # Get status
-            try:
-                status = self.status_from_data(self._data_dict)
-            except Exception as exc:
-                msg = "Error while getting the device status."
-                status = self.register_exception(exc, msg, ignore=True)
-            # Set status
-            if status is not None:
-                self.set_status(status)
+                self._data_dict[key] = None
+        # Get state
+        try:
+            state = self.state_from_data(self._data_dict)
+        except Exception as exc:
+            msg = "Error while getting the device state."
+            self.register_exception(exc, msg)
+            return
+        # Set state
+        if state is not None:
+            self.set_state(state)
+        # Get status
+        try:
+            status = self.status_from_data(self._data_dict)
+        except Exception as exc:
+            msg = "Error while getting the device status."
+            status = self.register_exception(exc, msg, ignore=True)
+        # Set status
+        if status is not None:
+            self.set_status(status)
 
     def safe_update(self, data):
         """Safe update to overrride."""
@@ -359,7 +385,8 @@ class Facade(Device):
         # Connection error
         if not self.connected:
             return
-        self.remote_update()
+        if self.require_attribute_polling:
+            self.remote_update()
         self.local_update()
 
     # Properties
@@ -415,24 +442,21 @@ class Facade(Device):
 
     # State, status and lock
 
-    def set_state(self, state):
+    def set_state(self, state, force=False):
         """Set the state and push events if necessary."""
-        with self._internal_lock:
-            Device.set_state(self, state)
+        with self._exception_lock:
+            if force or self.connected:
+                Device.set_state(self, state)
         if self.push_events:
             self.push_change_event('State')
 
-    def set_status(self, status):
+    def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
-        with self._internal_lock:
-            Device.set_status(self, status)
+        with self._exception_lock:
+            if force or self.connected:
+                Device.set_status(self, status)
         if self.push_events:
             self.push_change_event('Status')
-
-    def push_change_event(self, *args, **kwargs):
-        """Lock the calls to push change events."""
-        with self._internal_lock:
-            Device.push_change_event(self, *args, **kwargs)
 
     # Device properties
 
@@ -469,31 +493,38 @@ class Facade(Device):
             lines.append("This device does not push change events.")
         # Event subscription
         if self.ensure_events:
-            lines.append("This device ensures the event subscribtion "
+            lines.append("It ensures the event subscribtion "
                          "for all forwarded attributes.")
         elif any(self._evented_attrs.values()):
-            lines.append("This device subscribed to change event "
-                         "for the following attributes:")
-            lines.extend("- {0}: {1}/{2}".format(key, proxy.dev_name(), attr)
-                         for proxy, dct in self._evented_attrs.items()
-                         for attr, (key, eid) in dct.items())
+            lines.append("It subscribed to change event "
+                         "for the following attribute(s):")
+            for local, remote in self.evented_attributes:
+                lines.append("- {0}: {1}".format(local, remote))
         else:
-            lines.append("This device didn't subscribe to any event.")
+            lines.append("It didn't subscribe to any event.")
+        # Attribute polling
+        if self.require_attribute_polling:
+            lines.append("It is polling the following attribute(s):")
+            for local, remote in self.polled_attributes:
+                lines.append("- {0}: {1}".format(local, remote))
+        else:
+            lines.append("It doesn't poll any attribute from another device.")
         # Polling and caching
         if self.limit_period > 0:
-            line = ("This device limits the calls to other devices "
+            line = ("It limits the calls to other devices "
                     "by caching the read values for {0:.3f} seconds.")
             lines.append(line.format(self.limit_period))
         elif self.poll_update_command:
-            line = ("This device refresh its contents by polling "
+            line = ("It refreshes its contents by polling "
                     "the update command every {0:.3f} seconds.")
             lines.append(line.format(self.update_period))
         elif self.push_events:
-            lines.append("This device doesn't rely on any polling.")
+            lines.append("It doesn't rely on any polling.")
         else:
-            lines.append("This device doesn't use any caching "
+            lines.append("It doesn't use any caching "
                          "to limit the calls the other devices.")
         # Exception history
+        lines.append("-" * 5)
         if self._exception_history:
             lines.append("Error history:")
             for key, value in self._exception_history.items():
