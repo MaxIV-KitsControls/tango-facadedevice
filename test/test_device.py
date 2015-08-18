@@ -86,6 +86,7 @@ class ProxyTestCase(DeviceTestCase):
         cls.attrx.quality, cls.attry.quality = (AttrQuality.ATTR_VALID,) * 2
         cls.DeviceProxy = proxy_module.DeviceProxy = Mock(name="DeviceProxy")
         cls.proxy = cls.DeviceProxy.return_value
+        cls.proxy.dev_name.return_value = "some/device/name"
         cls.proxy.read_attributes.return_value = [cls.attry, cls.attrx]
         cls.proxy.subscribe_event.side_effect = DevFailed
 
@@ -126,8 +127,12 @@ class ProxyTestCase(DeviceTestCase):
         # Info command
         expected = """\
 This device does not push change events.
-This device didn't subscribe to any event.
-This device doesn't use any caching to limit the calls the other devices.
+It didn't subscribe to any event.
+It is polling the following attribute(s):
+- StatusOut: some/device/name/tag4
+- StatusIn: some/device/name/tag3
+It doesn't use any caching to limit the calls the other devices.
+-----
 No errors in the history.
 """
         self.assertEqual(self.device.GetInfo(), expected.strip())
