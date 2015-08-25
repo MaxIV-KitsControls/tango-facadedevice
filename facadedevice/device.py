@@ -6,7 +6,8 @@ from threading import Lock
 from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
-from facadedevice.common import DeviceMeta, cache_during, read_attributes
+from facadedevice.common import cache_during, debug_it
+from facadedevice.common import DeviceMeta, read_attributes
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
@@ -127,6 +128,7 @@ class Facade(Device):
 
     # Events handling
 
+    @debug_it
     def on_change_event(self, attr, event):
         "Handle attribute change events"
         # Ignore the event if not a data event
@@ -134,14 +136,18 @@ class Facade(Device):
             msg = "Received an unexpected event."
             self.register_exception(event, msg)
             return
+        # Format attribute name
+        attr_name = '/'.join(event.attr_name.split('/')[-4:])
         # Ignore the event if it contains an error
         if event.errors:
             exc = event.errors[0]
-            attr_name = '/'.join(event.attr_name.split('/')[-4:])
             template = "Received an event from {0} that contains errors."
             msg = template.format(attr_name)
             self.register_exception(exc, msg, origin=attr)
             return
+        # Info stream
+        msg = "Received a valid event from {0} for attribute {1}."
+        self.info_stream(msg.format(attr_name, attr))
         # Recover if needed
         self.recover_from(attr)
         # Save
@@ -168,6 +174,7 @@ class Facade(Device):
         try:
             self.stop_poll_command("Update")
         except DevFailed as exc:
+            self.info_stream('Update command is already stopped')
             self.debug_stream(str(exc))
 
     # Initialization
@@ -211,10 +218,12 @@ class Facade(Device):
                     proxy.unsubscribe_event(eid)
                 except Exception as exc:
                     self.debug_stream(str(exc))
+                    msg = "Cannot unsubscribe from change event for attribute"
                 else:
                     msg = "Unsubscribed from change event for attribute"
+                finally:
                     msg += " {0}/{1}".format(proxy.dev_name(), attr)
-                    self.debug_stream(msg)
+                    self.info_stream(msg)
         # Clear cache from cache decorator
         self.remote_update.pop_cache(self)
         # Clear internal attributes
@@ -301,13 +310,13 @@ class Facade(Device):
                     partial(self.on_change_event, attr))
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
-                self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
+                self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
                 if self.ensure_events:
                     raise
             else:
                 self._evented_attrs[proxy][attr_proxy] = attr, eid
                 msg = "Subscribed to change event for attribute {0}/{1}"
-                self.debug_stream(msg.format(proxy.dev_name(), attr_proxy))
+                self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
 
     # Update methods
 
@@ -337,6 +346,7 @@ class Facade(Device):
                 for attr, value in zip(polled, values):
                     self._data_dict[attr] = value
 
+    @debug_it
     def local_update(self):
         """Update logical attributes, state and status."""
         # Connection error

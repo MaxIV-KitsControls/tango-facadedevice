@@ -3,6 +3,7 @@
 # Imports
 import sys
 import time
+import ctypes
 import PyTango
 from threading import RLock
 from collections import deque
@@ -17,6 +18,40 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 # Stamped tuple
 _stamped = namedtuple("stamped", ("value", "stamp", "quality"))
 stamped = partial(_stamped, quality=AttrQuality.ATTR_VALID)
+
+
+# TID helper
+def gettid():
+    libc = 'libc.so.6'
+    for cmd in (186, 224, 178):
+        tid = ctypes.CDLL(libc).syscall(cmd)
+        if tid != -1:
+            return tid
+
+
+# Debug it decorator
+def debug_it(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Enter method
+        tid = gettid()
+        method = func.__name__
+        msg = "Entering method {0} (tid={1})"
+        self.debug_stream(msg.format(method, tid))
+        # Run method
+        try:
+            result = func(self, *args, **kwargs)
+        # Exit method with exception
+        except Exception as exception:
+            msg = "Method {0} failed (exception={1!r}, tid={2})"
+            self.debug_stream(msg.format(method, exception, tid))
+            raise
+        # Exit method with result
+        else:
+            msg = "Method {0} returned (result={1!r}, tid={2})"
+            self.debug_stream(msg.format(method, result, tid))
+            return result
+    return wrapper
 
 
 # Read attributes helper
@@ -184,6 +219,12 @@ class event_property(object):
 
     # Helper
 
+    def debug_stream(self, device, action, value):
+        action = action.capitalize()
+        attr = self.get_attribute_name()
+        msg = "{0} event property for attribute {1} (value={2}, tid={3})"
+        device.debug_stream(msg.format(action, attr, value, gettid()))
+
     def get_attribute_name(self):
         try:
             return self.attribute.attr_name
@@ -334,6 +375,7 @@ class event_property(object):
     # Private attribute access
 
     def get_value(self, device, attr=None):
+        # Get value
         with self.lock:
             try:
                 value = self.get_private_value(device)
@@ -343,12 +385,17 @@ class event_property(object):
                 value = self.get_default_value(device)
                 stamp = time.time()
                 quality = self.get_default_quality()
-            if attr:
-                attr.set_value_date_quality(value, stamp, quality)
-            return value, stamp, quality
+        # Set value
+        if attr:
+            attr.set_value_date_quality(value, stamp, quality)
+        # Stream
+        self.debug_stream(device, 'getting', value)
+        # Return
+        return value, stamp, quality
 
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
+        self.debug_stream(device, 'setting', value)
         with self.lock:
             # Prepare
             old_value, old_stamp, old_quality = self.get_value(device)
