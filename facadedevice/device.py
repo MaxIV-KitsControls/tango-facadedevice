@@ -56,6 +56,8 @@ class Facade(Device):
         """List polled attributes as (local name, proxy name)."""
         for device, attr_dict in self._read_dict.items():
             proxy = self._proxy_dict[device]
+            if not proxy:
+                continue
             for attr, attr_proxy in attr_dict.items():
                 if attr_proxy not in self._evented_attrs[proxy]:
                     attr_name = proxy.dev_name() + '/' + attr_proxy
