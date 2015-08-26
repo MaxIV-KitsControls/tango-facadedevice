@@ -4,13 +4,26 @@
 import sys
 import time
 import ctypes
-import PyTango
+
+# Import tools
 from threading import RLock
-from collections import deque
 from functools import wraps, partial
+
+# Imports data structure
+from collections import deque
 from weakref import WeakKeyDictionary
 from collections import MutableMapping, namedtuple
+
+# Imports PyTango
+import PyTango
 from PyTango import AttrQuality, AttReqType, server
+
+# Numpy print options
+try:
+    import numpy
+    numpy.set_printoptions(precision=5, threshold=6)
+except Exception:
+    print "Couldn't customize numpy print options"
 
 # Constants
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
@@ -222,7 +235,7 @@ class event_property(object):
     def debug_stream(self, device, action, value):
         action = action.capitalize()
         attr = self.get_attribute_name()
-        msg = "{0} event property for attribute {1} (value={2}, tid={3})"
+        msg = "{0} event property for attribute {1} (value={2!r}, tid={3})"
         device.debug_stream(msg.format(action, attr, value, gettid()))
 
     def get_attribute_name(self):
