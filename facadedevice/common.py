@@ -16,7 +16,7 @@ from collections import MutableMapping, namedtuple
 
 # Imports PyTango
 import PyTango
-from PyTango import AttrQuality, AttReqType, server
+from PyTango import AttrQuality, AttReqType, AttrWriteType, server
 
 # Numpy print options
 try:
@@ -118,6 +118,17 @@ def run_server(cls, args=None, **kwargs):
     return server.run((cls,), args, **kwargs)
 
 
+# Inheritance patch
+def inheritance_patch(attrs):
+    """Patch tango objects before they are processed."""
+    for key, obj in attrs.items():
+        if isinstance(obj, server.attribute):
+            if obj.attr_write == AttrWriteType.READ_WRITE:
+                if not getattr(obj, 'fset', None):
+                    method_name = obj.write_method_name or "write_" + key
+                    obj.fset = attrs.get(method_name)
+
+
 # DeviceMeta metaclass
 def DeviceMeta(name, bases, attrs):
     """Enhanced version of PyTango.server.DeviceMeta
@@ -135,6 +146,8 @@ def DeviceMeta(name, bases, attrs):
         for key, value in base.__dict__.items():
             if is_tango_object(value):
                 dct[key] = value
+    # Inheritance patch
+    inheritance_patch(attrs)
     # Update attribute dictionary
     dct.update(attrs)
     # Create device class
