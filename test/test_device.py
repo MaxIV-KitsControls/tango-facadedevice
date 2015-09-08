@@ -136,3 +136,10 @@ It doesn't use any caching to limit the calls the other devices.
 No errors in the history.
 """
         self.assertEqual(self.device.GetInfo(), expected.strip())
+
+    def test_exception(self):
+        self.proxy.read_attributes.side_effect = DevFailed("Fail!")
+        self.assertEqual(self.device.StatusIn, None)
+        self.assertEqual(self.device.State(), DevState.FAULT)
+        self.assertIn("Cannot read from proxy", self.device.Status())
+        self.assertIn("Fail!", self.device.Status())
