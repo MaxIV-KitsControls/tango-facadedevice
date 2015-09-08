@@ -8,7 +8,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it
 from facadedevice.common import DeviceMeta, read_attributes
-from facadedevice.objects import class_object, attribute_mapping, update_docs
+from facadedevice.objects import logical_attribute, update_docs
+from facadedevice.objects import class_object, attribute_mapping
 
 # PyTango
 from PyTango.server import Device, device_property, command
@@ -89,6 +90,12 @@ class Facade(Device):
 
     # Exception handling
 
+    def clear_attributes(self):
+        """Clear attribute data, except for local attributes."""
+        for key, value in self._class_dict["attributes"].items():
+            if isinstance(value, logical_attribute):
+                del self._data_dict[key]
+
     def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
         # Stream traceback
@@ -114,7 +121,7 @@ class Facade(Device):
         self.set_status(status, force=True)
         self.set_state(DevState.FAULT, force=True)
         # Clear data dict
-        self._data_dict.clear()
+        self.clear_attributes()
         return status
 
     def recover_from(self, origin):
