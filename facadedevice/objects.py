@@ -47,13 +47,11 @@ class proxy(class_object):
         dct[self.device] = device_property(dtype=str, doc="Proxy device.")
 
 
-# Logical attribute object
-class logical_attribute(class_object):
-    """Tango attribute computed from the values of other attributes.
-
-    Use it as a decorator to register the function that make this computation.
-    The decorated method take the attribute value dictionnary as argument.
-    Logical attributes also support the standard attribute keywords.
+# Local attribute object
+class local_attribute(class_object):
+    """Tango attribute with event support.
+    It will also be available through the data dictionary.
+    Local attributes support the standard attribute keywords.
     """
 
     def __init__(self, **kwargs):
@@ -64,11 +62,6 @@ class logical_attribute(class_object):
         self.attr = None
         self.device = None
 
-    def __call__(self, method):
-        """Decorator support."""
-        self.method = method
-        return self
-
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         # Property
@@ -78,6 +71,20 @@ class logical_attribute(class_object):
         # Attribute
         dct[key] = attribute(fget=prop.read, **self.kwargs)
         dct["_class_dict"]["attributes"][key] = self
+
+
+class logical_attribute(local_attribute):
+    """Tango attribute computed from the values of other attributes.
+
+    Use it as a decorator to register the function that make this computation.
+    The decorated method take the attribute value dictionnary as argument.
+    Logical attributes also support the standard attribute keywords.
+    """
+
+    def __call__(self, method):
+        """Decorator support."""
+        self.method = method
+        return self
 
 
 # Proxy attribute object
