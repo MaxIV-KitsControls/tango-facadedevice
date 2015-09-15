@@ -445,9 +445,9 @@ class event_property(object):
             self.set_private_value(device, value)
             self.set_private_stamp(device, stamp)
             self.set_private_quality(device, quality)
-        # Push event
-        if not disable_event and self.event_enabled(device):
-            self.push_event(device, *self.get_value(device))
+            # Push event
+            if not disable_event and self.event_enabled(device):
+                self.push_event(device, *self.get_value(device))
 
     # Aliases
 
@@ -457,11 +457,12 @@ class event_property(object):
     # Event method
 
     def push_event(self, device, value, stamp, quality):
-        attr = getattr(device, self.get_attribute_name())
-        if not attr.is_change_event():
-            attr.set_change_event(True, False)
-        device.push_change_event(self.get_attribute_name(),
-                                 value, stamp, quality)
+        with self.lock:
+            attr = getattr(device, self.get_attribute_name())
+            if not attr.is_change_event():
+                attr.set_change_event(True, False)
+            attr.set_value_date_quality(value, stamp, quality)
+            attr.fire_change_event()
 
 
 # Mapping object

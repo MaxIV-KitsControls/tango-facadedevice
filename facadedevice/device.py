@@ -466,16 +466,18 @@ class Facade(Device):
         with self._exception_lock:
             if force or self.connected:
                 Device.set_state(self, state)
-        if self.push_events:
-            self.push_change_event('State')
+            if self.push_events:
+                state_attr = self.get_device_attr().get_attr_by_name('State')
+                state_attr.fire_change_event()
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
         with self._exception_lock:
             if force or self.connected:
                 Device.set_status(self, status)
-        if self.push_events:
-            self.push_change_event('Status')
+            if self.push_events:
+                status_attr = self.get_device_attr().get_attr_by_name('Status')
+                status_attr.fire_change_event()
 
     # Device properties
 
