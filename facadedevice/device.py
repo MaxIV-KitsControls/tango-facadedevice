@@ -1,6 +1,7 @@
 """Provide the facade device class and metaclass"""
 
 # Imports
+import time
 import traceback
 from threading import Lock
 from functools import partial
@@ -200,6 +201,7 @@ class Facade(Device):
         self._exception_history = defaultdict(int)
         # Initialize state
         self.set_state(DevState.INIT)
+        self._init_stamp = time.time()
         # Init mappings
         self._tmp_dict = {}
         self._proxy_dict = {}
@@ -517,12 +519,13 @@ class Facade(Device):
         else:
             lines.append("This device does not push change events.")
         # Event subscription
-        if self.ensure_events:
-            lines.append("It ensures the event subscribtion "
-                         "for all forwarded attributes.")
-        elif any(self._evented_attrs.values()):
-            lines.append("It subscribed to change event "
-                         "for the following attribute(s):")
+        if any(self._evented_attrs.values()):
+            if self.ensure_events:
+                lines.append("It ensures the event subscribtion "
+                             "for all forwarded attributes:")
+            else:
+                lines.append("It subscribed to change event "
+                             "for the following attribute(s):")
             for local, remote in self.evented_attributes:
                 lines.append("- {0}: {1}".format(local, remote))
         else:
@@ -550,14 +553,17 @@ class Facade(Device):
                          "to limit the calls the other devices.")
         # Exception history
         lines.append("-" * 5)
+        strtime = time.ctime(self._init_stamp)
         if self._exception_history:
-            lines.append("Error history:")
+            msg = "Error history since {0} (last initialization):"
+            lines.append(msg.format(strtime))
             for key, value in self._exception_history.items():
                 string = 'once' if value == 1 else '{0} times'.format(value)
                 lines.append(' - Raised {0}:'.format(string))
                 lines.extend(' ' * 4 + line for line in key.split('\n'))
         else:
-            lines.append("No errors in the history.")
+            msg = "No errors in history since {0} (last initialization)."
+            lines.append(msg.format(strtime))
         # Return result
         return '\n'.join(lines)
 
