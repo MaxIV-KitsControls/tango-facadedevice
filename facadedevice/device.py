@@ -25,6 +25,9 @@ class Facade(Device):
     push_events = False
     update_period = 0
 
+    # Reasons to ignore for errors in events
+    reasons_to_ignore = ("API_PollThreadOutOfSync",)
+
     # Helpers
 
     @property
@@ -152,7 +155,8 @@ class Facade(Device):
             exc = event.errors[0]
             template = "Received an event from {0} that contains errors."
             msg = template.format(attr_name)
-            self.register_exception(exc, msg, origin=attr)
+            ignore = getattr(exc, "reason", None) in self.reasons_to_ignore
+            self.register_exception(exc, msg, origin=attr, ignore=ignore)
             return
         # Info stream
         msg = "Received a valid event from {0} for attribute {1}."
