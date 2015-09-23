@@ -39,12 +39,14 @@ class CameraScreen(Facade):
     # Proxy commands
     MoveIn = proxy_command(
         device="OPCDevice",
-        attr="InCmdTag",
+        prop="InCmdTag",
+        attr=True,
         value=1)
 
     MoveOut = proxy_command(
         device="OPCDevice",
-        attr="OutCmdTag",
+        prop="OutCmdTag",
+        attr=True,
         value=1)
 
     # State

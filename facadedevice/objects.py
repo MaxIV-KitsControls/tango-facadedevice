@@ -95,14 +95,18 @@ class proxy_attribute(logical_attribute, proxy):
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, device, attr, default_attr=None, **kwargs):
+    def __init__(self, device, attr=None, prop=None, **kwargs):
         """Initialize with the device property name, the attribute property
         name and the standard tango attribute keywords.
         """
         logical_attribute.__init__(self, **kwargs)
         proxy.__init__(self, device)
+        if not (attr or prop):
+            raise ValueError(
+                "Either attr or prop argument has to be specified "
+                "to initialize a proxy_attribute")
         self.attr = attr
-        self.default_attr = default_attr
+        self.prop = prop
 
     def update_class(self, key, dct):
         """Create properties, attribute and read method.
@@ -114,8 +118,9 @@ class proxy_attribute(logical_attribute, proxy):
         proxy.update_class(self, key, dct)
         # Create device property
         doc = "Attribute of {0} forwarded as {1}.".format(self.device, key)
-        dct[self.attr] = device_property(dtype=str, doc=doc,
-                                         default_value=self.default_attr)
+        if self.prop:
+            dct[self.prop] = device_property(dtype=str, doc=doc,
+                                             default_value=self.attr)
         # Write type
         write = self.kwargs.get("access") == AttrWriteType.READ_WRITE
         write = write and not dct.get("is_" + key + "_allowed")
@@ -140,22 +145,33 @@ class proxy_command(proxy):
     It supports standard command keywords.
     """
 
-    def __init__(self, device, attr, value, reset_value=None, reset_delay=0,
-                 **kwargs):
+    def __init__(self, device, attr=None, cmd=None, prop=None,
+                 value=None, reset_value=None, reset_delay=0, **kwargs):
         """Initialize with the device property name, the attribute property
         name, the value to write and the standard tango attribute
         keywords.
 
         Optionally you may add a reset_value and a
-        reset_delay [ms], meaning that the reset value will be written
+        reset_delay [s], meaning that the reset value will be written
         after some time (e.g. for PLCs where the tag needs to be
         zeroed again after setting). Note that this means that the
         command will take at least reset_delay ms to complete
         """
         proxy.__init__(self, device)
+        if attr and cmd:
+            raise ValueError(
+                "Both attr and cmd arguments can't be specified "
+                "to initialize a proxy_command")
+        if not (attr or cmd):
+            raise ValueError(
+                "Either attr or cmd argument has to be specified "
+                "to initialize a proxy_command")
         self.kwargs = kwargs
         self.value = value
+        self.cmd = cmd
         self.attr = attr
+        self.prop = prop
+        self.is_attr = bool(attr)
         self.reset_value = reset_value
         self.reset_delay = reset_delay
 
@@ -169,24 +185,41 @@ class proxy_command(proxy):
         def run_command(device):
             """Write the attribute of the remote device with the value."""
             # Get data
-            attr, value, reset_value, reset_delay = device._command_dict[key]
+            name, is_attr, value, reset, delay = device._command_dict[key]
             # Check attribute
-            if attr.strip().lower() == "none":
-                msg = "no attribute for {0} property."
-                raise ValueError(msg.format(self.attr))
-            # Write
+            if name.strip().lower() == "none":
+                if is_attr:
+                    msg = "No attribute to write for commmand {0}"
+                else:
+                    msg = "No sub-command to run for command {0}"
+                raise ValueError(msg.format(key))
+            # Prepare
             proxy_name = device._device_dict[key]
             device_proxy = device._proxy_dict[proxy_name]
-            device_proxy.write_attribute(attr, value)
-            if reset_value is not None:
-                time.sleep(reset_delay / 1000.0)
-                device_proxy.write_attribute(attr, reset_value)
+            if is_attr:
+                write = device_proxy.write_attribute
+            else:
+                write = device_proxy.command_inout
+            # Write
+            result = write(name, value)
+            # Reset
+            if reset is not None:
+                time.sleep(delay)
+                write(name, reset)
+            # Return
+            return result
 
         # Set command
         cmd = command(**self.kwargs)
         run_command.__name__ = key
-        doc = "Write the attribute '{0}' of '{1}' with value {2}"
-        run_command.__doc__ = doc.format(self.attr, self.device, self.value)
+        if self.is_attr:
+            doc = "Write the attribute '{0}' of '{1}' with value {2}"
+            run_command.__doc__ = doc.format(self.prop or self.attr,
+                                             self.device, self.value)
+        else:
+            doc = "Run the command '{0}' of '{1}' with value {2}"
+            run_command.__doc__ = doc.format(self.prop or self.cmd,
+                                             self.device, self.value)
         dct[key] = cmd(run_command)
 
         # Is allowed method
@@ -194,14 +227,17 @@ class proxy_command(proxy):
             """The method is allowed if the device is connected."""
             return device.connected
 
-        # Set method
+        # Set is allowed method
         method_name = "is_" + key + "_allowed"
-        # prefer user defined "is_X_allowed" methods
         if method_name not in dct:
             is_allowed.__name__ = method_name
             dct[method_name] = is_allowed
+
         # Create properties
-        dct[self.attr] = device_property(dtype=str, doc=self.attr)
+        default = self.attr if self.is_attr else self.prop
+        if not isinstance(default, basestring):
+            default = None
+        dct[self.prop] = device_property(dtype=str, doc=default)
 
 
 # Update docs function
