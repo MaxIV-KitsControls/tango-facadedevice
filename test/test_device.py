@@ -23,12 +23,12 @@ class CameraScreen(Facade):
     # Proxy attributes
     StatusIn = proxy_attribute(
         device="OPCDevice",
-        attr="InStatusTag",
+        prop="InStatusTag",
         dtype=bool)
 
     StatusOut = proxy_attribute(
         device="OPCDevice",
-        attr="OutStatusTag",
+        prop="OutStatusTag",
         dtype=bool)
 
     # Logical attributes
@@ -61,9 +61,9 @@ class CameraScreen(Facade):
             return "Conflict between IN and OUT informations"
         return "IN" if data['StatusIn'] else "OUT"
 
-    @command
-    def Reset(self):
-        self.devices["PLCDevice"].Reset()
+    Reset = proxy_command(
+        device="PLCDevice",
+        cmd="Reset")
 
 
 # Device test case
@@ -125,7 +125,7 @@ class ProxyTestCase(DeviceTestCase):
         self.proxy.write_attribute.assert_called_with("tag2", 1)
         # Rest command
         self.device.Reset()
-        self.proxy.Reset.assert_called_once_with()
+        self.proxy.command_inout.assert_called_once_with("Reset", None)
         # Info command
         expected = """\
 This device does not push change events.
@@ -135,9 +135,9 @@ It is polling the following attribute(s):
 - StatusIn: some/device/name/tag3
 It doesn't use any caching to limit the calls the other devices.
 -----
-No errors in the history.
+No errors in history since
 """
-        self.assertEqual(self.device.GetInfo(), expected.strip())
+        self.assertIn(expected.strip(), self.device.GetInfo())
 
     def test_exception(self):
         self.proxy.read_attributes.side_effect = DevFailed("Fail!")
