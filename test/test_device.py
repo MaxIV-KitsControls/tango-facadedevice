@@ -133,9 +133,9 @@ It is polling the following attribute(s):
 - StatusIn: some/device/name/tag3
 It doesn't use any caching to limit the calls the other devices.
 -----
-No errors in the history.
+No errors in history since
 """
-        self.assertEqual(self.device.GetInfo(), expected.strip())
+        self.assertIn(expected.strip(), self.device.GetInfo())
 
     def test_exception(self):
         self.proxy.read_attributes.side_effect = DevFailed("Fail!")
