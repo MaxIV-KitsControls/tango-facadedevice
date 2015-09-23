@@ -60,6 +60,7 @@ class local_attribute(class_object):
         self.dtype = self.kwargs['dtype']
         self.method = None
         self.attr = None
+        self.prop = None
         self.device = None
 
     def update_class(self, key, dct):
@@ -234,10 +235,11 @@ class proxy_command(proxy):
             dct[method_name] = is_allowed
 
         # Create properties
-        default = self.attr if self.is_attr else self.prop
-        if not isinstance(default, basestring):
-            default = None
-        dct[self.prop] = device_property(dtype=str, doc=default)
+        if self.prop:
+            default = self.attr if self.is_attr else self.cmd
+            if not isinstance(default, basestring):
+                default = None
+            dct[self.prop] = device_property(dtype=str, doc=default)
 
 
 # Update docs function
