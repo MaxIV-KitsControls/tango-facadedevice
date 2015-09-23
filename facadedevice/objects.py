@@ -92,13 +92,35 @@ class logical_attribute(local_attribute):
 class proxy_attribute(logical_attribute, proxy):
     """Tango attribute linked to the attribute of a remote device.
 
-    Device and attribute are given as property names.
+    Args:
+        device (str):
+            Name of the property that contains the device name.
+        prop (str):
+            Name of the property containing the attribute name.
+            None to not use a property (None by default).
+        attr (str):
+            Name of the attribute to forward. If `prop` is specified,
+            `attr` is the default property value (None by default).
+
+    A ValueError is raised if neither of `prop` or `attr` is specified.
     Also supports the standard attribute keywords.
     """
 
     def __init__(self, device, attr=None, prop=None, **kwargs):
-        """Initialize with the device property name, the attribute property
-        name and the standard tango attribute keywords.
+        """Initialize the proxy attribute.
+
+        Args:
+            device (str):
+                Name of the property that contains the device name.
+            prop (str):
+                Name of the property containing the attribute name.
+                None to not use a property (None by default).
+            attr (str):
+                Name of the attribute to forward. If `prop` is specified,
+                `attr` is the default property value (None by default).
+
+        A ValueError is raised if neither of `prop` or `attr` is specified.
+        Also supports the standard attribute keywords.
         """
         logical_attribute.__init__(self, **kwargs)
         proxy.__init__(self, device)
@@ -140,23 +162,77 @@ class proxy_attribute(logical_attribute, proxy):
 
 # Proxy command object
 class proxy_command(proxy):
-    """Command to write an attribute of a remote device with a given value.
+    """Command to write an attribute or run a command
+    of a remote device with a given value.
 
-    Attribute and device are given as property names.
-    It supports standard command keywords.
+    Args:
+        device (str):
+            Name of the property that contains the device name.
+        prop (str):
+            Name of the property containing the attribute or command name.
+            None to not use a property (None by default)
+        attr (str):
+            Name of the attribute to write.
+            If `prop` is specified, `attr` is the default property value.
+            `attr` can be True to indicate attribute mode without specifiying
+            a default value.
+        cmd (str):
+            Name of the command to run.
+            If `prop` is specified, `cmd` is the default property value.
+            `cmd` can be True to indicate command mode without specifiying
+            a default value
+        value (any type):
+            The value to write the attribute or send to the command.
+            None by default, to run a command with no argument.
+        reset_value (any type):
+            An optional value to write the attribute or send to the command
+            after the `value`. Typically used to reset a flag in a PLC.
+            None by default, to not perform a reset action.
+        reset_delay (float):
+            Delay in seconds between the set and the reset actions.
+            Default is 0; ignored if no `reset_value` given.
+
+
+    A ValueError is raised if neither of `attr` or `cmd` is specified.
+    A ValueError is raised if both `attr` and `cmd` are specified.
+    Also supports the standard command keywords
     """
 
     def __init__(self, device, attr=None, cmd=None, prop=None,
                  value=None, reset_value=None, reset_delay=0, **kwargs):
-        """Initialize with the device property name, the attribute property
-        name, the value to write and the standard tango attribute
-        keywords.
+        """Initialize the proxy command.
 
-        Optionally you may add a reset_value and a
-        reset_delay [s], meaning that the reset value will be written
-        after some time (e.g. for PLCs where the tag needs to be
-        zeroed again after setting). Note that this means that the
-        command will take at least reset_delay ms to complete
+        Args:
+            device (str):
+                Name of the property that contains the device name.
+            prop (str):
+                Name of the property containing the attribute or command name.
+                None to not use a property (None by default)
+            attr (str):
+                Name of the attribute to write.
+                If `prop` is specified, `attr` is the default property value.
+                `attr` can be True to indicate attribute mode without
+                specifiying a default value.
+            cmd (str):
+                Name of the command to run.
+                If `prop` is specified, `cmd` is the default property value.
+                `cmd` can be True to indicate command mode without specifiying
+                a default value
+            value (any type):
+                The value to write the attribute or send to the command.
+                None by default, to run a command with no argument.
+            reset_value (any type):
+                An optional value to write the attribute or send to the command
+                after the `value`. Typically used to reset a flag in a PLC.
+                None by default, to not perform a reset action.
+            reset_delay (float):
+                Delay in seconds between the set and the reset actions.
+                Default is 0; ignored if no `reset_value` given.
+
+
+        A ValueError is raised if neither of `attr` or `cmd` is specified.
+        A ValueError is raised if both `attr` and `cmd` are specified.
+        Also supports the standard command keywords
         """
         proxy.__init__(self, device)
         if attr and cmd:
