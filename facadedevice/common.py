@@ -123,7 +123,7 @@ def inheritance_patch(attrs):
     """Patch tango objects before they are processed."""
     for key, obj in attrs.items():
         if isinstance(obj, server.attribute):
-            if obj.attr_write == AttrWriteType.READ_WRITE:
+            if getattr(obj, 'attr_write', None) == AttrWriteType.READ_WRITE:
                 if not getattr(obj, 'fset', None):
                     method_name = obj.write_method_name or "write_" + key
                     obj.fset = attrs.get(method_name)
