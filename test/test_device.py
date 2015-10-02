@@ -23,12 +23,12 @@ class CameraScreen(Facade):
     # Proxy attributes
     StatusIn = proxy_attribute(
         device="OPCDevice",
-        attr="InStatusTag",
+        prop="InStatusTag",
         dtype=bool)
 
     StatusOut = proxy_attribute(
         device="OPCDevice",
-        attr="OutStatusTag",
+        prop="OutStatusTag",
         dtype=bool)
 
     # Logical attributes
@@ -39,12 +39,14 @@ class CameraScreen(Facade):
     # Proxy commands
     MoveIn = proxy_command(
         device="OPCDevice",
-        attr="InCmdTag",
+        prop="InCmdTag",
+        attr=True,
         value=1)
 
     MoveOut = proxy_command(
         device="OPCDevice",
-        attr="OutCmdTag",
+        prop="OutCmdTag",
+        attr=True,
         value=1)
 
     # State
@@ -59,9 +61,9 @@ class CameraScreen(Facade):
             return "Conflict between IN and OUT informations"
         return "IN" if data['StatusIn'] else "OUT"
 
-    @command
-    def Reset(self):
-        self.devices["PLCDevice"].Reset()
+    Reset = proxy_command(
+        device="PLCDevice",
+        cmd="Reset")
 
 
 # Device test case
@@ -123,7 +125,7 @@ class ProxyTestCase(DeviceTestCase):
         self.proxy.write_attribute.assert_called_with("tag2", 1)
         # Rest command
         self.device.Reset()
-        self.proxy.Reset.assert_called_once_with()
+        self.proxy.command_inout.assert_called_once_with("Reset", None)
         # Info command
         expected = """\
 This device does not push change events.

@@ -257,19 +257,30 @@ class Facade(Device):
             self._device_dict[device] = proxy_name
         # Get informations for attributes
         for attr, value in sorted(self._class_dict["attributes"].items()):
-            if value.attr and value.device:
-                proxy_attr = getattr(self, value.attr)
-                if proxy_attr.strip().lower() == "none":
+            # Get attribute proxy name
+            if value.prop:
+                attr_name = getattr(self, value.prop)
+            else:
+                attr_name = value.attr
+            # Set up read dictionary
+            if attr_name and value.device:
+                if attr_name.strip().lower() == "none":
                     continue
                 proxy_name = getattr(self, value.device)
-                self._attribute_dict[attr] = proxy_attr
-                self._read_dict[proxy_name][attr] = proxy_attr
+                self._attribute_dict[attr] = attr_name
+                self._read_dict[proxy_name][attr] = attr_name
+            # Set up method dictionary
             if value.method:
                 self._method_dict[attr] = value.method.__get__(self)
         # Get informations for commands
         for cmd, value in self._class_dict["commands"].items():
-            attr = getattr(self, value.attr)
-            self._command_dict[cmd] = (attr, value.value,
+            # Get proxy name
+            if value.prop:
+                proxy_name = getattr(self, value.prop)
+            else:
+                proxy_name = value.attr or value.cmd
+            # Set up commad dict
+            self._command_dict[cmd] = (proxy_name, value.is_attr, value.value,
                                        value.reset_value, value.reset_delay)
 
     def init_connection(self):
