@@ -27,7 +27,7 @@ class Facade(Device):
     update_period = 0
 
     # Reasons to ignore for errors in events
-    reasons_to_ignore = ("API_PollThreadOutOfSync",)
+    reasons_to_ignore = ["API_PollThreadOutOfSync"]
 
     # Helpers
 
@@ -95,9 +95,10 @@ class Facade(Device):
     # Exception handling
 
     def clear_attributes(self):
-        """Clear attribute data, except for local attributes."""
+        """Clear attribute data, except for local and evented attributes."""
+        evented = [attr for attr, attr_name in self.evented_attributes]
         for key, value in self._class_dict["attributes"].items():
-            if isinstance(value, logical_attribute):
+            if isinstance(value, logical_attribute) and key not in evented:
                 del self._data_dict[key]
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
