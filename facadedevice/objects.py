@@ -140,7 +140,7 @@ class proxy_attribute(logical_attribute, proxy):
         logical_attribute.update_class(self, key, dct)
         proxy.update_class(self, key, dct)
         # Create device property
-        doc = "Attribute of {0} forwarded as {1}.".format(self.device, key)
+        doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
         if self.prop:
             dct[self.prop] = device_property(dtype=str, doc=doc,
                                              default_value=self.attr)
@@ -315,7 +315,13 @@ class proxy_command(proxy):
             default = self.attr if self.is_attr else self.cmd
             if not isinstance(default, basestring):
                 default = None
-            dct[self.prop] = device_property(dtype=str, doc=default)
+            if self.is_attr:
+                doc = "Attribute of '{0}' to write "
+            else:
+                doc = "Command of '{0}' to run "
+            doc += "when command {1} is executed"
+            dct[self.prop] = device_property(dtype=str, default_value=default,
+                                             doc=doc.format(self.device, key))
 
 
 # Update docs function
