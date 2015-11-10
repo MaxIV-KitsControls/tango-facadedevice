@@ -94,11 +94,14 @@ class Facade(Device):
 
     # Exception handling
 
-    def clear_attributes(self):
-        """Clear attribute data, except for local and evented attributes."""
+    def clear_attributes(self, forced=()):
+        """Clear attribute data, except for local and evented attributes.
+
+        Attributes in forced argument will be cleared in any case."""
         evented = [attr for attr, attr_name in self.evented_attributes]
         for key, value in self._class_dict["attributes"].items():
-            if isinstance(value, logical_attribute) and key not in evented:
+            non_local = isinstance(value, logical_attribute)
+            if key in forced or non_local and key not in evented:
                 del self._data_dict[key]
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
@@ -126,7 +129,7 @@ class Facade(Device):
         self.set_status(status, force=True)
         self.set_state(DevState.FAULT, force=True)
         # Clear data dict
-        self.clear_attributes()
+        self.clear_attributes(forced=(origin,))
         return status
 
     def recover_from(self, origin):
