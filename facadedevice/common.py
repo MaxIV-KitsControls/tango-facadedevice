@@ -6,7 +6,7 @@ import time
 import ctypes
 
 # Import tools
-from threading import RLock
+from threading import RLock, current_thread
 from functools import wraps, partial
 
 # Imports data structure
@@ -37,7 +37,10 @@ stamped = partial(_stamped, quality=AttrQuality.ATTR_VALID)
 def gettid():
     libc = 'libc.so.6'
     for cmd in (186, 224, 178):
-        tid = ctypes.CDLL(libc).syscall(cmd)
+        try:
+            tid = ctypes.CDLL(libc).syscall(cmd)
+        except OSError:
+            return current_thread().ident
         if tid != -1:
             return tid
 
