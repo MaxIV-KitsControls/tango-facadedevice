@@ -1,4 +1,4 @@
-tangods-facadedevice
+python-facadedevice
 ===================
 ***
 
@@ -7,11 +7,11 @@ Provide a facade device to subclass.
 Information
 -----------
 
- - Package: tangods-facadedevice
+ - Package: python-facadedevice
  - Device:  Facade (+ FacadeMeta)
- - Repo:    [dev-maxiv-facadedevice][repo]
+ - Repo:    [lib-maxiv-facadedevice][repo]
 
-[repo]: https://gitorious.maxlab.lu.se/kits-maxiv/dev-maxiv-facadedevice/
+[repo]: https://github.com/MaxIV-KitsControls/lib-maxiv-facadedevice.git
 
 
 Usage
