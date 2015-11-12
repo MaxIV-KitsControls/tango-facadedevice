@@ -53,12 +53,12 @@ class CameraScreen(Facade):
     # Proxy attributes
     StatusIn = proxy_attribute(
         device="OPCDevice",
-        attr="InStatusTag",
+        prop="InStatusTag",
         dtype=bool)
 
     StatusOut = proxy_attribute(
         device="OPCDevice",
-        attr="OutStatusTag",
+        prop="OutStatusTag",
         dtype=bool)
 
     # Logical attributes
@@ -69,12 +69,14 @@ class CameraScreen(Facade):
     # Proxy commands
     MoveIn = proxy_command(
         device="OPCDevice",
-        attr="InCmdTag",
+        prop="InCmdTag",
+        attr=True,
         value=1)
 
     MoveOut = proxy_command(
         device="OPCDevice",
-        attr="OutCmdTag",
+        prop="OutCmdTag",
+        attr=True,
         value=1)
 
     # State
