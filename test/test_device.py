@@ -129,7 +129,8 @@ class ProxyTestCase(DeviceTestCase):
         self.proxy.command_inout.assert_called_once_with("Reset", None)
         # Info command
         expected = """\
-This device does not push change events.
+The device is currently connected.
+It does not push change events.
 It didn't subscribe to any event.
 It is polling the following attribute(s):
 - StatusOut: some/device/name/tag4
