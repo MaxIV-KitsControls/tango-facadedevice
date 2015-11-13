@@ -337,7 +337,8 @@ class event_property(object):
         return value, None, None
 
     def check_value(self, device, value, stamp, quality):
-        if value in (None, self.invalid):
+        if value is None or \
+           (self.invalid is not None and value == self.invalid):
             return self.get_default_value(device), stamp, self.INVALID
         if self.dtype:
             value = self.dtype(value)
