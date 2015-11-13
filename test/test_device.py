@@ -86,7 +86,8 @@ class ProxyTestCase(DeviceTestCase):
         cls.attrx.time.totime.return_value = 0
         cls.attry.time.totime.return_value = 0
         cls.attrx.quality, cls.attry.quality = (AttrQuality.ATTR_VALID,) * 2
-        cls.DeviceProxy = proxy_module.DeviceProxy = Mock(name="DeviceProxy")
+        proxy_module.create_device_proxy = Mock(name="DeviceProxy")
+        cls.DeviceProxy = proxy_module.create_device_proxy
         cls.proxy = cls.DeviceProxy.return_value
         cls.proxy.dev_name.return_value = "some/device/name"
         cls.proxy.read_attributes.return_value = [cls.attry, cls.attrx]
