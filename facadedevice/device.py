@@ -7,14 +7,14 @@ from threading import Lock
 from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
-from facadedevice.common import cache_during, debug_it
+from facadedevice.common import cache_during, debug_it, create_device_proxy
 from facadedevice.common import DeviceMeta, read_attributes
 from facadedevice.objects import logical_attribute, update_docs
 from facadedevice.objects import class_object, attribute_mapping
 
 # PyTango
 from PyTango.server import Device, device_property, command
-from PyTango import DeviceProxy, DevFailed, DevState, EventType, EventData
+from PyTango import DevFailed, DevState, EventType, EventData
 
 
 # Proxy device
@@ -308,7 +308,7 @@ class Facade(Device):
                     if device.strip().lower() == "none":
                         proxy = None
                     else:
-                        proxy = DeviceProxy(device)
+                        proxy = create_device_proxy(device)
                     self._proxy_dict[device] = proxy
                     self._evented_attrs[proxy] = {}
 

@@ -70,6 +70,13 @@ def debug_it(func):
     return wrapper
 
 
+# Patched device proxy
+def create_device_proxy(*args, **kwargs):
+    proxy = PyTango.DeviceProxy(*args, **kwargs)
+    proxy._get_info_()
+    return proxy
+
+
 # Read attributes helper
 def read_attributes(proxy, attributes):
     """Modified version of DeviceProxy.read_attribute."""
