@@ -528,11 +528,18 @@ class Facade(Device):
     def GetInfo(self):
         """Return information about polling and events."""
         lines = []
+        # Connection
+        if self.connected:
+            lines.append("The device is currently connected.")
+        else:
+            lines.append("The device is currently stopped because of:")
+            for origin in self._exception_origins:
+                lines.append(" - {0!r}".format(origin))
         # Event sending
         if self.push_events:
-            lines.append("This device pushes change events.")
+            lines.append("It pushes change events.")
         else:
-            lines.append("This device does not push change events.")
+            lines.append("It does not push change events.")
         # Event subscription
         if any(self._evented_attrs.values()):
             if self.ensure_events:
