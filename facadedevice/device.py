@@ -3,7 +3,7 @@
 # Imports
 import time
 import traceback
-from threading import Lock
+from threading import RLock
 from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
@@ -147,6 +147,11 @@ class Facade(Device):
 
     @debug_it
     def on_change_event(self, attr, event):
+        "Acquire the lock and handle attribute change events"
+        with self._update_lock:
+            return self.on_change_event_safe(attr, event)
+
+    def on_change_event_safe(self, attr, event):
         "Handle attribute change events"
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
@@ -200,7 +205,8 @@ class Facade(Device):
     def init_device(self):
         """Initialize the device."""
         # Init exception data structure
-        self._exception_lock = Lock()
+        self._update_lock = RLock()
+        self._exception_lock = RLock()
         self._exception_origins = set()
         self._exception_history = defaultdict(int)
         # Initialize state
@@ -422,12 +428,12 @@ class Facade(Device):
 
     def update_all(self):
         """Update all."""
-        # Connection error
-        if not self.connected:
-            return
-        if self.require_attribute_polling:
-            self.remote_update()
-        self.local_update()
+        with self._update_lock:
+            if not self.connected:
+                return
+            if self.require_attribute_polling:
+                self.remote_update()
+            self.local_update()
 
     # Properties
 
