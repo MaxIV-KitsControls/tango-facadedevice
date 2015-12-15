@@ -9,8 +9,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
 from facadedevice.common import DeviceMeta, read_attributes
-from facadedevice.objects import logical_attribute, update_docs
-from facadedevice.objects import class_object, attribute_mapping
+from facadedevice.objects import logical_attribute, block_attribute
+from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
 from PyTango.server import Device, device_property, command
@@ -221,6 +221,7 @@ class Facade(Device):
         self._evented_attrs = {}
         self._attribute_dict = {}
         self._read_dict = defaultdict(dict)
+        self._block_dict = defaultdict(dict)
         self._data_dict = attribute_mapping(self)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
@@ -274,11 +275,15 @@ class Facade(Device):
                 attr_name = value.attr
             # Set up read dictionary
             if attr_name and value.device:
+                proxy_name = self._device_dict[attr]
                 if attr_name.strip().lower() == "none":
-                    continue
-                proxy_name = getattr(self, value.device)
-                self._attribute_dict[attr] = attr_name
-                self._read_dict[proxy_name][attr] = attr_name
+                    pass
+                elif isinstance(value, block_attribute):
+                    self._block_dict[proxy_name][attr] = attr_name
+                    self._attribute_dict[attr] = attr_name + '*'
+                else:
+                    self._attribute_dict[attr] = attr_name
+                    self._read_dict[proxy_name][attr] = attr_name
             # Set up method dictionary
             if value.method:
                 self._method_dict[attr] = value.method.__get__(self)
@@ -315,8 +320,24 @@ class Facade(Device):
                         proxy = None
                     else:
                         proxy = create_device_proxy(device)
+                        self.init_block_attributes(device, proxy)
                     self._proxy_dict[device] = proxy
                     self._evented_attrs[proxy] = {}
+
+    def init_block_attributes(self, device, proxy):
+        """Handle block attributes."""
+        if device not in self._block_dict:
+            return
+        remote_list = proxy.get_attribute_list()
+        for local, prefix in self._block_dict[device].items():
+            local_list = []
+            for remote in remote_list:
+                if remote.lower().startswith(prefix.lower()):
+                    name = local + '.' + remote[len(prefix):]
+                    self._read_dict[device][name] = remote
+                    self._data_dict.key_list.append(name)
+                    local_list.append(name)
+            self._block_dict[device][local] = local_list
 
     # Setup listeners
 
