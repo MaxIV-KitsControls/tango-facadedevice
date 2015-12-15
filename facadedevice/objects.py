@@ -127,7 +127,7 @@ class proxy_attribute(logical_attribute, proxy):
         if not (attr or prop):
             raise ValueError(
                 "Either attr or prop argument has to be specified "
-                "to initialize a proxy_attribute")
+                "to initialize a {0}".format(type(self).__name__))
         self.attr = attr
         self.prop = prop
 
@@ -144,11 +144,12 @@ class proxy_attribute(logical_attribute, proxy):
         if self.prop:
             dct[self.prop] = device_property(dtype=str, doc=doc,
                                              default_value=self.attr)
-        # Write type
-        write = self.kwargs.get("access") == AttrWriteType.READ_WRITE
-        write = write and not dct.get("is_" + key + "_allowed")
-        write = write and not set(self.kwargs) & set(["fwrite", "fset"])
-        if not write:
+        # Read-only
+        if not self.writable:
+            return
+        # Custom write
+        if dct.get("is_" + key + "_allowed") or \
+           set(self.kwargs) & set(["fwrite", "fset"]):
             return
 
         # Write method
@@ -158,6 +159,87 @@ class proxy_attribute(logical_attribute, proxy):
             proxy_attr = device._attribute_dict[key]
             device_proxy.write_attribute(proxy_attr, value)
         dct[key] = dct[key].setter(write)
+
+    @property
+    def writable(self):
+        return self.kwargs.get("access") == AttrWriteType.READ_WRITE or \
+            set(self.kwargs) & set(["fwrite", "fset"])
+
+
+# Block attribute object
+class block_attribute(proxy_attribute):
+    """Tango attribute linked to several attributes of a remote device.
+
+    Args:
+        device (str):
+            Name of the property that contains the device name.
+        prop (str):
+            Name of the property containing the attribute prefix.
+            None to not use a property (None by default).
+        attr (str):
+            Prefix of the attributes to forward. If `prop` is specified,
+            `attr` is the default property value (None by default).
+
+    A ValueError is raised if neither of `prop` or `attr` is specified.
+    Also supports the standard attribute keywords.
+    """
+
+    def __init__(self, device, attr=None, prop=None, **kwargs):
+        """Initialize the proxy attribute.
+
+        Args:
+            device (str):
+                Name of the property that contains the device name.
+            prop (str):
+                Name of the property containing the attribute prefix.
+                None to not use a property (None by default).
+            attr (str):
+                Prefix of the attributes to forward. If `prop` is specified,
+                `attr` is the default property value (None by default).
+
+        A ValueError is raised if neither of `prop` or `attr` is specified.
+        Also supports the standard attribute keywords.
+        """
+        kwargs.setdefault('dtype', self.dtype)
+        kwargs.setdefault('max_dim_x', 2)
+        kwargs.setdefault('max_dim_y', 1000)
+        proxy_attribute.__init__(self, device, attr, prop, **kwargs)
+        if self.writable:
+            raise ValueError("A block attribute has to be read-only")
+
+    def update_class(self, key, dct):
+        """Create the attribute and read method."""
+        proxy_attribute.update_class(self, key, dct)
+        self.method = self.make_method(key)
+
+    def __call__(self, *args, **kwargs):
+        raise TypeError("A block attribute cannot be used as a decorator")
+
+    @classmethod
+    def make_method(cls, key):
+        def update(self, data):
+            device = self._device_dict[key]
+            attrs = self._block_dict[device][key]
+            return [(cls.format_name(attr), cls.format_value(data[attr]))
+                    for attr in attrs]
+        return update
+
+    @staticmethod
+    def format_name(name):
+        return name.split('.')[-1].replace('__', '.')
+
+    @staticmethod
+    def format_value(value):
+        return str(value.value if value.value is not None else value.quality)
+
+    @property
+    def dtype(self):
+        return ((str,),)
+
+    @dtype.setter
+    def dtype(self, value):
+        if value != self.dtype:
+            raise ValueError("A block attribute has to be an image of string")
 
 
 # Proxy command object
