@@ -77,6 +77,25 @@ def create_device_proxy(*args, **kwargs):
     return proxy
 
 
+# Patched command
+def patched_command(**kwargs):
+    """Patched version of PyTango.server.command."""
+    config_dict = {}
+    if 'disp_level' in kwargs:
+        config_dict['Display level'] = kwargs.pop('disp_level')
+    if 'polling_period' in kwargs:
+        config_dict['Polling period'] = kwargs.pop('polling_period')
+    inner_decorator = server.command(**kwargs)
+
+    def decorator(func):
+        func = inner_decorator(func)
+        name, config = func.__tango_command__
+        config.append(config_dict)
+        return func
+
+    return decorator
+
+
 # Read attributes helper
 def read_attributes(proxy, attributes):
     """Modified version of DeviceProxy.read_attribute."""

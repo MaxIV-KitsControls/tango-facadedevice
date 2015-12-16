@@ -3,8 +3,8 @@
 # Imports
 import time
 from PyTango import AttrWriteType, CmdArgType
-from PyTango.server import device_property, attribute, command
-from facadedevice.common import event_property, mapping
+from PyTango.server import device_property, attribute
+from facadedevice.common import event_property, mapping, patched_command
 
 # Constants
 PREFIX = ''
@@ -411,7 +411,7 @@ class proxy_command(proxy):
             return result.value
 
         # Set command
-        cmd = command(**self.kwargs)
+        cmd = patched_command(**self.kwargs)
         run_command.__name__ = key
         if self.is_attr:
             doc = "Write the attribute '{0}' of '{1}' with value {2}"
