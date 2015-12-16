@@ -168,7 +168,8 @@ class proxy_attribute(logical_attribute, proxy):
 
 # Block attribute object
 class block_attribute(proxy_attribute):
-    """Tango attribute linked to several attributes of a remote device.
+    """Tango attribute to gather several attributes of a remote device
+    using a common prefix.
 
     Args:
         device (str):
@@ -185,7 +186,7 @@ class block_attribute(proxy_attribute):
     """
 
     def __init__(self, device, attr=None, prop=None, **kwargs):
-        """Initialize the proxy attribute.
+        """Initialize the block attribute.
 
         Args:
             device (str):
