@@ -2,7 +2,7 @@
 
 # Imports
 import time
-from PyTango import AttrWriteType
+from PyTango import AttrWriteType, CmdArgType
 from PyTango.server import device_property, attribute, command
 from facadedevice.common import event_property, mapping
 
@@ -201,7 +201,7 @@ class block_attribute(proxy_attribute):
         Also supports the standard attribute keywords.
         """
         kwargs.setdefault('dtype', self.dtype)
-        kwargs.setdefault('max_dim_x', 2)
+        kwargs.setdefault('max_dim_x', 5)
         kwargs.setdefault('max_dim_y', 1000)
         proxy_attribute.__init__(self, device, attr, prop, **kwargs)
         if self.writable:
@@ -220,7 +220,7 @@ class block_attribute(proxy_attribute):
         def update(self, data):
             device = self._device_dict[key]
             attrs = self._block_dict[device][key]
-            return [(cls.format_name(attr), cls.format_value(data[attr]))
+            return [(cls.format_name(attr),) + cls.format_value(data[attr])
                     for attr in attrs]
         return update
 
@@ -230,7 +230,8 @@ class block_attribute(proxy_attribute):
 
     @staticmethod
     def format_value(value):
-        return str(value.value if value.value is not None else value.quality)
+        return (str(value.value), str(value.quality),
+                str(value.type), str(value.time))
 
     @property
     def dtype(self):
@@ -277,10 +278,19 @@ class proxy_command(proxy):
 
     A ValueError is raised if neither of `attr` or `cmd` is specified.
     A ValueError is raised if both `attr` and `cmd` are specified.
-    Also supports the standard command keywords
+    Also supports the standard command keywords.
+
+    If dtype_in is defined, the command argument is given to the
+    sub-command or used to write the sub0attribute.
+
+    If dtype_out is defined, the command returns the result of the last
+    sub-command, or the value of the attribute after it's been written.
     """
 
+    void = CmdArgType.DevVoid
+
     def __init__(self, device, attr=None, cmd=None, prop=None,
+                 dtype_in=None, dtype_out=None,
                  value=None, reset_value=None, reset_delay=0, **kwargs):
         """Initialize the proxy command.
 
@@ -314,9 +324,21 @@ class proxy_command(proxy):
 
         A ValueError is raised if neither of `attr` or `cmd` is specified.
         A ValueError is raised if both `attr` and `cmd` are specified.
-        Also supports the standard command keywords
+        Also supports the standard command keywords.
+
+        If dtype_in is defined, the command argument is given to the
+        sub-command or used to write the sub-attribute.
+
+        If dtype_out is defined, the command returns the result of the last
+        sub-command, or the value of the attribute after it's been written.
         """
         proxy.__init__(self, device)
+        # Cast dtype
+        if dtype_in == self.void:
+            dtype_in = None
+        if dtype_out == self.void:
+            dtype_out = None
+        # Check arguments
         if attr and cmd:
             raise ValueError(
                 "Both attr and cmd arguments can't be specified "
@@ -325,6 +347,17 @@ class proxy_command(proxy):
             raise ValueError(
                 "Either attr or cmd argument has to be specified "
                 "to initialize a proxy_command")
+        if value is not None and dtype_in is not None:
+            raise ValueError(
+                "Both dtype_in and value can't be specified "
+                "to initialize a proxy_command")
+        if bool(attr) and value is None and dtype_in is None:
+            raise ValueError(
+                "value or dtype_in has to be specified "
+                "when the command is linked to an attribute")
+        # Save arguments
+        self.dtype_in = kwargs['dtype_in'] = dtype_in
+        self.dtype_out = kwargs['dtype_out'] = dtype_out
         self.kwargs = kwargs
         self.value = value
         self.cmd = cmd
@@ -341,10 +374,13 @@ class proxy_command(proxy):
         dct["_class_dict"]["commands"][key] = self
 
         # Command method
-        def run_command(device):
+        def run_command(device, arg=None):
             """Write the attribute of the remote device with the value."""
             # Get data
             name, is_attr, value, reset, delay = device._command_dict[key]
+            # Get value
+            if self.dtype_in:
+                value = arg
             # Check attribute
             if name.strip().lower() == "none":
                 if is_attr:
@@ -364,9 +400,15 @@ class proxy_command(proxy):
             # Reset
             if reset is not None:
                 time.sleep(delay)
-                write(name, reset)
+                result = write(name, reset)
             # Return
-            return result
+            if not self.dtype_out:
+                return
+            if not is_attr:
+                return result
+            # Read attribute
+            result = device_proxy.read_attribute(name)
+            return result.value
 
         # Set command
         cmd = command(**self.kwargs)
