@@ -81,8 +81,8 @@ def create_device_proxy(*args, **kwargs):
 def patched_command(**kwargs):
     """Patched version of PyTango.server.command."""
     config_dict = {}
-    if 'disp_level' in kwargs:
-        config_dict['Display level'] = kwargs.pop('disp_level')
+    if 'display_level' in kwargs:
+        config_dict['Display level'] = kwargs.pop('display_level')
     if 'polling_period' in kwargs:
         config_dict['Polling period'] = kwargs.pop('polling_period')
     inner_decorator = server.command(**kwargs)
