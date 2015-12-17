@@ -99,7 +99,9 @@ def patched_command(**kwargs):
 # Read attributes helper
 def read_attributes(proxy, attributes):
     """Modified version of DeviceProxy.read_attribute."""
-    result = proxy.read_attributes(attributes)
+    attributes = map(str.strip, map(str.lower, attributes))
+    attrs = list(set(attributes))
+    result = proxy.read_attributes(attrs)
     for attr, res in zip(attributes, result):
         if not res.has_failed:
             continue
@@ -108,7 +110,8 @@ def read_attributes(proxy, attributes):
         except PyTango.DevFailed as exc:
             if exc[0].reason != ATTR_NOT_ALLOWED:
                 raise
-    return result
+    mapping = dict(zip(attrs, result))
+    return [mapping[attr] for attr in attributes]
 
 
 # Tango objects
