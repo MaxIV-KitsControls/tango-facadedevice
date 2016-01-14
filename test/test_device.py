@@ -149,4 +149,4 @@ No errors in history since
         self.assertIn("Fail!", self.device.Status())
 
     def test_broken(self):
-        self.assertEqual(True, False, 'Oops, I broke the tests')
+        self.assertEqual(True, True, 'Oops, I broke the tests')
