@@ -147,3 +147,6 @@ No errors in history since
         self.assertEqual(self.device.State(), DevState.FAULT)
         self.assertIn("Cannot read from proxy", self.device.Status())
         self.assertIn("Fail!", self.device.Status())
+
+    def test_broken(self):
+        self.assertEqual(True, False, 'Oops, I broke the tests')
