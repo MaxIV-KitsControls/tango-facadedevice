@@ -4,19 +4,15 @@
 import sys
 import time
 import ctypes
+import weakref
+import threading
+import functools
+import collections
 
-# Import tools
-from threading import RLock, current_thread
-from functools import wraps, partial
-
-# Imports data structure
-from collections import deque
-from weakref import WeakKeyDictionary
-from collections import MutableMapping, namedtuple
-
-# Imports PyTango
+# PyTango imports
 import PyTango
-from PyTango import AttrQuality, AttReqType, AttrWriteType, server
+from PyTango import server
+from PyTango import AttrQuality, AttReqType, AttrWriteType
 
 # Numpy print options
 try:
@@ -29,8 +25,8 @@ except Exception:
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 
 # Stamped tuple
-_stamped = namedtuple("stamped", ("value", "stamp", "quality"))
-stamped = partial(_stamped, quality=AttrQuality.ATTR_VALID)
+_stamped = collections.namedtuple("stamped", ("value", "stamp", "quality"))
+stamped = functools.partial(_stamped, quality=AttrQuality.ATTR_VALID)
 
 
 # TID helper
@@ -40,14 +36,14 @@ def gettid():
         try:
             tid = ctypes.CDLL(libc).syscall(cmd)
         except OSError:
-            return current_thread().ident
+            return threading.current_thread().ident
         if tid != -1:
             return tid
 
 
 # Debug it decorator
 def debug_it(func):
-    @wraps(func)
+    @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         # Enter method
         tid = gettid()
@@ -193,7 +189,7 @@ def catch_key_error(func=None, dtype=int):
     """Return a decorator to catch index errors."""
     def decorator(func):
         """Decorator to catch index erros."""
-        @wraps(func)
+        @functools.wraps(func)
         def wrapper(self):
             """Wrapper for attribute reader."""
             try:
@@ -214,10 +210,10 @@ def cache_during(timeout_attr, debug_stream=None):
     """Decorator to cache a result during an amount of time
     defined by a given attribute name.
     """
-    cache = WeakKeyDictionary()
+    cache = weakref.WeakKeyDictionary()
 
     def decorator(func):
-        @wraps(func)
+        @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get debug stream
             func_name = func.__name__
@@ -227,7 +223,7 @@ def cache_during(timeout_attr, debug_stream=None):
                 stream = lambda msg: None
             # Get stamps and value
             timeout = getattr(self, timeout_attr)
-            queue, value = cache.get(self, (deque(maxlen=10), None))
+            queue, value = cache.get(self, (collections.deque(maxlen=10), None))
             stamp = queue[-1] if queue else -timeout
             now = time.time()
             # Log periodicity
@@ -265,7 +261,7 @@ class event_property(object):
 
     def __init__(self, attribute, default=None, invalid=None,
                  is_allowed=None, event=True, dtype=None, doc=None):
-        self.lock = RLock()
+        self.lock_cache = weakref.WeakKeyDictionary()
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
@@ -276,6 +272,9 @@ class event_property(object):
         self.is_allowed = is_allowed or default
 
     # Helper
+
+    def get_lock(self, device):
+        return self.lock_cache.setdefault(device, threading.RLock())
 
     def debug_stream(self, device, action, value):
         action = action.capitalize()
@@ -435,7 +434,7 @@ class event_property(object):
 
     def get_value(self, device, attr=None):
         # Get value
-        with self.lock:
+        with self.get_lock(device):
             try:
                 value = self.get_private_value(device)
                 stamp = self.get_private_stamp(device)
@@ -455,7 +454,7 @@ class event_property(object):
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
         self.debug_stream(device, 'setting', value)
-        with self.lock:
+        with self.get_lock(device):
             # Prepare
             old_value, old_stamp, old_quality = self.get_value(device)
             if value is None:
@@ -490,7 +489,7 @@ class event_property(object):
     # Event method
 
     def push_event(self, device, value, stamp, quality):
-        with self.lock:
+        with self.get_lock(device):
             attr = getattr(device, self.get_attribute_name())
             if not attr.is_change_event():
                 attr.set_change_event(True, False)
@@ -499,7 +498,7 @@ class event_property(object):
 
 
 # Mapping object
-class mapping(MutableMapping):
+class mapping(collections.MutableMapping):
     """Mapping object to gather python attributes."""
 
     def clear(self):
