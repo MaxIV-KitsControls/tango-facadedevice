@@ -24,7 +24,7 @@ setup(name="facadedevice",
       packages=['facadedevice'],
       setup_requires=['nose', 'rpm2'],
       install_requires=['PyTango'],
-      tests_require=['nose>=1.3.7','mock', 'python-devicetest'],
+      tests_require=['mock', 'python-devicetest'],
       dependency_links=['git+https://github.com/vxgmichel/pytango-devicetest.git#egg=python-devicetest',
                         'git+https://github.com/vxgmichel/setuptools-rpm2.git#egg=rpm2']
       )
