@@ -509,7 +509,7 @@ class event_property(object):
                 attr.set_archive_event(True, True)
             # Push archive event
             device.push_archive_event(self.get_attribute_name(),
-                                      value=value, stamp=stamp, quality=quality)
+                                      value, stamp, quality)
 
 
 # Mapping object
