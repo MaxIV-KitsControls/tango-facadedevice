@@ -472,6 +472,9 @@ class event_property(object):
             except ValueError:
                 diff = diff.any()
             if not diff:
+                # Push archive event even in any case
+                if not disable_event and self.event_enabled(device):
+                    self.push_archive_event(device, value, stamp, quality)
                 return
             # Set
             self.set_private_value(device, value)
@@ -486,7 +489,7 @@ class event_property(object):
     read = get_value
     write = set_value
 
-    # Event method
+    # Event methods
 
     def push_event(self, device, value, stamp, quality):
         with self.get_lock(device):
@@ -495,6 +498,18 @@ class event_property(object):
                 attr.set_change_event(True, False)
             attr.set_value_date_quality(value, stamp, quality)
             attr.fire_change_event()
+            # also push archive event
+            self.push_archive_event(device, value, stamp, quality)
+
+    def push_archive_event(self, device, value, stamp, quality):
+        with self.get_lock(device):
+            attr = getattr(device, self.get_attribute_name())
+            if not attr.is_archive_event():
+                # Enable verification of event properties
+                attr.set_archive_event(True, True)
+            # Push archive event
+            device.push_archive_event(self.get_attribute_name(),
+                                      value=value, stamp=stamp, quality=quality)
 
 
 # Mapping object
