@@ -59,6 +59,8 @@ class Facade(Device):
     @property
     def polled_attributes(self):
         """List polled attributes as (local name, proxy name)."""
+        if self.ensure_events:
+            return
         for device, attr_dict in self._read_dict.items():
             proxy = self._proxy_dict[device]
             if not proxy:
@@ -538,6 +540,12 @@ class Facade(Device):
     PushEvents = device_property(
         dtype=bool,
         doc="Enable change events for all attributes.",
+        default_value=False,
+        )
+
+    HeavyLogging = device_property(
+        dtype=bool,
+        doc="Enable heavy logging.",
         default_value=False,
         )
 

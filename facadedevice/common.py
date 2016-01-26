@@ -210,9 +210,9 @@ def cache_during(timeout_attr, debug_stream=None):
     """Decorator to cache a result during an amount of time
     defined by a given attribute name.
     """
-    cache = weakref.WeakKeyDictionary()
-
     def decorator(func):
+        cache = weakref.WeakKeyDictionary()
+
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get debug stream
@@ -223,7 +223,8 @@ def cache_during(timeout_attr, debug_stream=None):
                 stream = lambda msg: None
             # Get stamps and value
             timeout = getattr(self, timeout_attr)
-            queue, value = cache.get(self, (collections.deque(maxlen=10), None))
+            defaults = collections.deque(maxlen=10), None
+            queue, value = cache.get(self, defaults)
             stamp = queue[-1] if queue else -timeout
             now = time.time()
             # Log periodicity
@@ -245,9 +246,11 @@ def cache_during(timeout_attr, debug_stream=None):
             cache[self] = queue, value
             # Return
             return value
+
         # Create cache access
         wrapper.pop_cache = lambda arg: cache.pop(arg, None)
         return wrapper
+
     return decorator
 
 
@@ -277,6 +280,8 @@ class event_property(object):
         return self.lock_cache.setdefault(device, threading.RLock())
 
     def debug_stream(self, device, action, value):
+        if not getattr(device, 'HeavyLogging', False):
+            return
         action = action.capitalize()
         attr = self.get_attribute_name()
         msg = "{0} event property for attribute {1} (value={2!r}, tid={3})"
