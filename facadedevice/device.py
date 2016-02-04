@@ -9,6 +9,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
 from facadedevice.common import DeviceMeta, read_attributes
+from facadedevice.common import is_tangocmd_exist, is_writable_attribute
 from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
@@ -234,6 +235,8 @@ class Facade(Device):
         self.init_data_structure()
         # Connection
         self.init_connection()
+        # Check proxy_commands attributes exist
+        self.check_proxy_commands()
 
     def delete_device(self):
         """Unsubscribe events and clear attributes values."""
@@ -339,6 +342,27 @@ class Facade(Device):
                     local_list.append(name)
             self._block_dict[device][local] = local_list
 
+    def check_proxy_commands(self):
+        """ Check if proxy commands attributes exist and are writable. """
+        msg = ""
+        for cmd_name, cmd_args in self._command_dict.iteritems():
+            # unpack
+            attr_name, is_attr, cmd_value, _, _ = cmd_args
+            #
+            proxy_name = self._device_dict[cmd_name]
+            device_proxy = self._proxy_dict[proxy_name]
+            if is_attr:
+                # proxy command writes in tango attribute
+                writable, desc = is_writable_attribute(attr_name, device_proxy)
+                if not writable:
+                    # attribute is not writable
+                    msg += "-Command {0} failure: {1}\n".format(cmd_name, desc)
+            else:
+                # proxy command is a forwarded command
+                cmd_exists, desc = is_tangocmd_exist(attr_name, device_proxy)
+                msg += "-Command '{0}' failure: {1}\n".format(cmd_name, desc)
+        if msg:
+            self.register_exception(msg, "Proxy command errors :")
     # Setup listeners
 
     def setup_listeners(self):

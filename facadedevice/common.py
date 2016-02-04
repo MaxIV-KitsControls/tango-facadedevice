@@ -13,6 +13,7 @@ import collections
 import PyTango
 from PyTango import server
 from PyTango import AttrQuality, AttReqType, AttrWriteType
+from PyTango import CmdArgType, DevFailed
 
 # Numpy print options
 try:
@@ -122,6 +123,41 @@ def is_tango_object(arg):
         return arg.__tango_command__
     except AttributeError:
         return False
+
+
+def is_writable_attribute(attr_name, device_proxy):
+    """ Return if tango attribute exists and is writable, and also return
+     string description """
+    desc = "Attribute {0}/{1} is writable"
+    writable = True
+    try:
+        # get attribute configuration
+        cfg = device_proxy.get_attribute_config(attr_name)
+        if cfg.writable is AttrWriteType.READ:
+            # attribute exists but it is not writable
+            desc = "Attribute {0}/{1} is not  writable"
+            writable = False
+    except DevFailed:
+        # attribute doesn't exist
+        desc = "Can't find attribute {0}/{1} "
+        writable = False
+    desc = desc.format(device_proxy, attr_name)
+    return writable, desc
+
+
+def is_tangocmd_exist(cmd_name, device_proxy):
+    """ Return if tango command exist and return string description."""
+    desc = "Command {0}/{1} exists"
+    cmd_exists = True
+    try:
+        # check command description
+        device_proxy.command_query(cmd_name)
+    except DevFailed:
+        # command_query failed, command doesn't exist
+        desc += "-Command {0}/{1} doesn't exist'\n"
+        cmd_exists = False
+    desc = desc.format(device_proxy, cmd_name)
+    return cmd_exists, desc
 
 
 # Run server class method
