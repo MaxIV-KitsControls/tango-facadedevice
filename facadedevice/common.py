@@ -472,7 +472,7 @@ class event_property(object):
             except ValueError:
                 diff = diff.any()
             if not diff:
-                # Push archive event even in any case
+                # Push archive event in any case
                 if not disable_event and self.event_enabled(device):
                     self.push_archive_event(device, value, stamp, quality)
                 return
