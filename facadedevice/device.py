@@ -4,7 +4,6 @@
 import time
 import traceback
 from threading import RLock
-from functools import partial
 from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
@@ -366,7 +365,7 @@ class Facade(Device):
                 eid = proxy.subscribe_event(
                     attr_proxy,
                     EventType.CHANGE_EVENT,
-                    partial(self.on_change_event, attr))
+                    lambda event: self.on_change_event(attr, event))
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
