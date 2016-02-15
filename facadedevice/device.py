@@ -9,7 +9,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
 from facadedevice.common import DeviceMeta, read_attributes
-from facadedevice.common import is_tangocmd_exist, is_writable_attribute
+from facadedevice.common import tangocmd_exist, is_writable_attribute
 from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
@@ -359,7 +359,7 @@ class Facade(Device):
                     msg += "-Command {0} failure: {1}\n".format(cmd_name, desc)
             else:
                 # proxy command is a forwarded command
-                cmd_exists, desc = is_tangocmd_exist(attr_name, device_proxy)
+                cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
                 msg += "-Command '{0}' failure: {1}\n".format(cmd_name, desc)
         if msg:
             self.register_exception(msg, "Proxy command errors :")

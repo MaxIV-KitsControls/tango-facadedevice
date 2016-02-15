@@ -145,7 +145,7 @@ def is_writable_attribute(attr_name, device_proxy):
     return writable, desc
 
 
-def is_tangocmd_exist(cmd_name, device_proxy):
+def tangocmd_exist(cmd_name, device_proxy):
     """ Return if tango command exist and return string description."""
     desc = "Command {0}/{1} exists"
     cmd_exists = True
