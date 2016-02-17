@@ -365,7 +365,7 @@ class Facade(Device):
                 eid = proxy.subscribe_event(
                     attr_proxy,
                     EventType.CHANGE_EVENT,
-                    lambda event: self.on_change_event(attr, event))
+                    lambda event, attr=attr: self.on_change_event(attr, event))
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
