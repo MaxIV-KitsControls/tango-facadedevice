@@ -135,7 +135,7 @@ def is_writable_attribute(attr_name, device_proxy):
         cfg = device_proxy.get_attribute_config(attr_name)
         if cfg.writable is AttrWriteType.READ:
             # attribute exists but it is not writable
-            desc = "Attribute {0}/{1} is not  writable"
+            desc = "Attribute {0}/{1} is not writable"
             writable = False
     except DevFailed:
         # attribute doesn't exist
