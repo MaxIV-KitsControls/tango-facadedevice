@@ -428,7 +428,7 @@ class event_property(object):
                            disable_event=reset)
         # Force events
         if reset and self.event_enabled(device):
-            self.push_event(device, *self.get_value(device))
+            self.push_events(device, *self.get_value(device))
 
     # Private attribute access
 
@@ -471,18 +471,14 @@ class event_property(object):
                 bool(diff)
             except ValueError:
                 diff = diff.any()
-            if not diff:
-                # Push archive event in any case
-                if not disable_event and self.event_enabled(device):
-                    self.push_archive_event(device, value, stamp, quality)
-                return
-            # Set
-            self.set_private_value(device, value)
-            self.set_private_stamp(device, stamp)
-            self.set_private_quality(device, quality)
-            # Push event
+            if diff:
+                # Set
+                self.set_private_value(device, value)
+                self.set_private_stamp(device, stamp)
+                self.set_private_quality(device, quality)
+            # Push events
             if not disable_event and self.event_enabled(device):
-                self.push_event(device, *self.get_value(device))
+                self.push_events(device, *self.get_value(device), diff=diff)
 
     # Aliases
 
@@ -491,25 +487,23 @@ class event_property(object):
 
     # Event methods
 
-    def push_event(self, device, value, stamp, quality):
+    def push_events(self, device, value, stamp, quality, diff=True):
         with self.get_lock(device):
-            attr = getattr(device, self.get_attribute_name())
-            if not attr.is_change_event():
-                attr.set_change_event(True, False)
-            attr.set_value_date_quality(value, stamp, quality)
-            attr.fire_change_event()
+            attr_name = self.get_attribute_name()
+            attr = getattr(device, attr_name)
+            if diff :
+                # push change event
+                if not attr.is_change_event():
+                    attr.set_change_event(True, False)
+                attr.set_value_date_quality(value, stamp, quality)
+                attr.fire_change_event()
             # also push archive event
-            self.push_archive_event(device, value, stamp, quality)
-
-    def push_archive_event(self, device, value, stamp, quality):
-        with self.get_lock(device):
-            attr = getattr(device, self.get_attribute_name())
             if not attr.is_archive_event():
                 # Enable verification of event properties
                 attr.set_archive_event(True, True)
-            # Push archive event
-            device.push_archive_event(self.get_attribute_name(),
-                                      value, stamp, quality)
+            device.push_archive_event(attr_name, value, stamp, quality)
+
+
 
 
 # Mapping object
