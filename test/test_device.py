@@ -4,7 +4,7 @@
 from mock import Mock
 from PyTango.server import command
 from devicetest import DeviceTestCase
-from PyTango import DevState, DevFailed, AttrQuality
+from PyTango import DevState, DevFailed, AttrQuality, AttrWriteType
 
 # Proxy imports
 from facadedevice import Facade, FacadeMeta
@@ -150,3 +150,22 @@ No errors in history since
 
     def test_broken(self):
         self.assertEqual(True, True, 'Oops, I broke the tests')
+
+    def test_writable_attributes(self):
+        self.proxy.get_attribute_config().writable = AttrWriteType.READ
+        self.device.init()
+        status = self.device.status()
+        self.assertIn("command moveout failure: attribute",status)
+        self.assertIn("command movein failure: attribute", status)
+        self.assertIn("not writable", status)
+        self.assertEqual(self.device.state(), DevState.FAULT)
+
+    def test_tangocmd_exist(self):
+        self.proxy.command_query.side_effect = DevFailed
+        self.device.init()
+        self.assertEqual(self.device.state(), DevState.FAULT)
+        status =  self.device.status()
+        self.assertIn("command 'reset' failure: command", status)
+        self.assertIn("doesn't exist", status)
+
+
