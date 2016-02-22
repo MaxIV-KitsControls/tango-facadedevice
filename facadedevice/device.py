@@ -360,7 +360,9 @@ class Facade(Device):
             else:
                 # proxy command is a forwarded command
                 cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
-                msg += "-Command '{0}' failure: {1}\n".format(cmd_name, desc)
+                if not cmd_exists:
+                    err_msg = "-Command '{0}' failure: {1}\n"
+                    msg += err_msg.format(cmd_name, desc)
         if msg:
             self.register_exception(msg, "Proxy command errors :")
     # Setup listeners
