@@ -155,8 +155,8 @@ No errors in history since
         self.proxy.get_attribute_config().writable = AttrWriteType.READ
         self.device.init()
         status = self.device.status()
-        self.assertIn("command moveout failure: attribute",status)
-        self.assertIn("command movein failure: attribute", status)
+        self.assertIn("command 'moveout' failure: attribute",status)
+        self.assertIn("command 'movein' failure: attribute", status)
         self.assertIn("not writable", status)
         self.assertEqual(self.device.state(), DevState.FAULT)
 
