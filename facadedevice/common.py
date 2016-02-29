@@ -141,7 +141,7 @@ def is_writable_attribute(attr_name, device_proxy):
         # attribute doesn't exist
         desc = "Can't find attribute {0}/{1} "
         writable = False
-    desc = desc.format(device_proxy, attr_name)
+    desc = desc.format(device_proxy.name(), attr_name)
     return writable, desc
 
 
@@ -156,7 +156,7 @@ def tangocmd_exist(cmd_name, device_proxy):
         # command_query failed, command doesn't exist
         desc += "-Command {0}/{1} doesn't exist'\n"
         cmd_exists = False
-    desc = desc.format(device_proxy, cmd_name)
+    desc = desc.format(device_proxy.name(), cmd_name)
     return cmd_exists, desc
 
 

@@ -357,15 +357,15 @@ class Facade(Device):
                 writable, desc = is_writable_attribute(attr_name, device_proxy)
                 if not writable:
                     # attribute is not writable
-                    msg += "-Command {0} failure: {1}\n".format(cmd_name, desc)
+                    msg += "- Command '{0}' failure: {1}\n".format(cmd_name, desc)
             else:
                 # proxy command is a forwarded command
                 cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
                 if not cmd_exists:
-                    err_msg = "-Command '{0}' failure: {1}\n"
+                    err_msg = "- Command '{0}' failure: {1}\n"
                     msg += err_msg.format(cmd_name, desc)
         if msg:
-            self.register_exception(msg, "Proxy command errors :")
+            self.register_exception(msg, "Proxy command errors:")
     # Setup listeners
 
     def setup_listeners(self):
