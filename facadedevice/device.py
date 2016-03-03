@@ -351,8 +351,8 @@ class Facade(Device):
             # unpack
             attr_name, is_attr, cmd_value, _, _ = cmd_args
             if attr_name.strip().lower() == NONE_STRING:
-                warning = "- Command '{0}' disabled: attribute is set to '{1}'"
-                warnings += warning.format(cmd_name, attr_name)
+                warn = "- Command '{0}' disabled: attribute is set to '{1}'\n"
+                warnings += warn.format(cmd_name, attr_name)
                 continue
             proxy_name = self._device_dict[cmd_name]
             device_proxy = self._proxy_dict[proxy_name]
