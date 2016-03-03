@@ -5,6 +5,7 @@ import time
 from PyTango import AttrWriteType, CmdArgType
 from PyTango.server import device_property, attribute
 from facadedevice.common import event_property, mapping, patched_command
+from facadedevice.common import NONE_STRING
 
 # Constants
 PREFIX = ''
@@ -383,7 +384,7 @@ class proxy_command(proxy):
             if self.dtype_in:
                 value = arg
             # Check attribute
-            if name.strip().lower() == "none":
+            if name.strip().lower() == NONE_STRING:
                 if is_attr:
                     msg = "No attribute to write for commmand {0}"
                 else:
