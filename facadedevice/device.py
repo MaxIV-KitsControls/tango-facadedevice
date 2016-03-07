@@ -7,7 +7,7 @@ from threading import RLock
 from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
-from facadedevice.common import DeviceMeta, read_attributes
+from facadedevice.common import DeviceMeta, read_attributes, NONE_STRING
 from facadedevice.common import tangocmd_exist, is_writable_attribute
 from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
@@ -280,7 +280,7 @@ class Facade(Device):
             # Set up read dictionary
             if attr_name and value.device:
                 proxy_name = self._device_dict[attr]
-                if attr_name.strip().lower() == "none":
+                if attr_name.strip().lower() == NONE_STRING:
                     pass
                 elif isinstance(value, block_attribute):
                     self._block_dict[proxy_name][attr] = attr_name
@@ -320,7 +320,7 @@ class Facade(Device):
             # Connect to proxies
             for device in self._device_dict.values():
                 if device not in self._proxy_dict:
-                    if device.strip().lower() == "none":
+                    if device.strip().lower() == NONE_STRING:
                         proxy = None
                     else:
                         proxy = create_device_proxy(device)
@@ -345,11 +345,15 @@ class Facade(Device):
 
     def check_proxy_commands(self):
         """ Check if proxy commands attributes exist and are writable. """
-        msg = ""
+        errors = ""
+        warnings = ""
         for cmd_name, cmd_args in self._command_dict.iteritems():
             # unpack
             attr_name, is_attr, cmd_value, _, _ = cmd_args
-            #
+            if attr_name.strip().lower() == NONE_STRING:
+                warn = "- Command '{0}' disabled: attribute is set to '{1}'\n"
+                warnings += warn.format(cmd_name, attr_name)
+                continue
             proxy_name = self._device_dict[cmd_name]
             device_proxy = self._proxy_dict[proxy_name]
             if is_attr:
@@ -357,15 +361,20 @@ class Facade(Device):
                 writable, desc = is_writable_attribute(attr_name, device_proxy)
                 if not writable:
                     # attribute is not writable
-                    msg += "- Command '{0}' failure: {1}\n".format(cmd_name, desc)
+                    err_msg = "- Command '{0}' failure: {1}\n"
+                    errors += err_msg.format(cmd_name, desc)
             else:
                 # proxy command is a forwarded command
                 cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
                 if not cmd_exists:
                     err_msg = "- Command '{0}' failure: {1}\n"
-                    msg += err_msg.format(cmd_name, desc)
-        if msg:
-            self.register_exception(msg, "Proxy command errors:")
+                    errors += err_msg.format(cmd_name, desc)
+        if errors:
+            self.register_exception(errors, "Proxy command errors:")
+        if warnings:
+            warning_title = "Proxy command warnings"
+            self.register_exception(warnings, warning_title, ignore=True)
+
     # Setup listeners
 
     def setup_listeners(self):

@@ -24,6 +24,7 @@ except Exception:
 
 # Constants
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
+NONE_STRING = "none"
 
 # Stamped tuple
 _stamped = collections.namedtuple("stamped", ("value", "stamp", "quality"))
