@@ -90,7 +90,7 @@ class Facade(Device):
         try:
             yield
         except exceptions as exc:
-            if isinstance(exc, DevFailed):
+            if isinstance(exc, DevFailed) and exc.args:
                 exc = exc.args[0]
             self.register_exception(exc, msg, ignore)
 
@@ -657,16 +657,22 @@ def FacadeMeta(name, bases, dct):
     Return a FacadeMeta instance.
     """
     # Class attribute
-    dct["_class_dict"] = {"attributes": {},
-                          "commands":   {},
-                          "devices":    {}}
+    dct["_class_dict"] = class_dict = {
+        "attributes": {},
+        "commands":   {},
+        "devices":    {}}
     # Inheritance
     for base in reversed(bases):
         try:
-            for key, value in dct["_class_dict"].items():
-                value.update(base._class_dict.get(key, {}))
+            base_class_dict = base._class_dict
         except AttributeError:
             continue
+        # Copy _class_dict from the bases
+        for type_key, object_dict in class_dict.items():
+            for key, obj in base_class_dict[type_key].items():
+                # Allow to remove facade objects by setting them to None
+                if key not in dct or True:
+                    object_dict[key] = obj
     # Proxy objects
     for key, value in dct.items():
         if isinstance(value, class_object):
