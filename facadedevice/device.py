@@ -680,7 +680,7 @@ def FacadeMeta(name, bases, dct):
         for type_key, object_dict in class_dict.items():
             for key, obj in base_class_dict[type_key].items():
                 # Allow to remove facade objects by setting them to None
-                if key not in dct or True:
+                if key not in dct:
                     object_dict[key] = obj
     # Proxy objects
     for key, value in dct.items():
