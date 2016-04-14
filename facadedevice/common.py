@@ -303,11 +303,13 @@ class event_property(object):
     VALID = AttrQuality.ATTR_VALID
 
     def __init__(self, attribute, default=None, invalid=None,
-                 is_allowed=None, event=True, dtype=None, doc=None):
+                 is_allowed=None, event=True, dtype=None,
+                 callback=None, doc=None):
         self.lock_cache = weakref.WeakKeyDictionary()
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
+        self.callback = callback
         self.event = event
         self.dtype = dtype if callable(dtype) else None
         self.__doc__ = doc
@@ -349,6 +351,22 @@ class event_property(object):
         if self.event and isinstance(self.event, basestring):
             return getattr(device, self.event)
         return self.event
+
+    def notify(self, device, *args):
+        callback = self.callback
+        if not callback:
+            return
+        # Prepare callback
+        if isinstance(callback, basestring):
+            callback = getattr(device, callback, None)
+        else:
+            callback = functools.partial(callback, device)
+        # Run callback
+        try:
+            callback(*args)
+        except Exception as exc:
+            msg = "Exception while running callback for attribute {}: {!r}"
+            device.error_stream(msg.format(self.get_attribute_name(), exc))
 
     def get_private_value(self, device):
         name = "__" + self.get_attribute_name() + "_value"
@@ -521,6 +539,8 @@ class event_property(object):
                 self.set_private_value(device, value)
                 self.set_private_stamp(device, stamp)
                 self.set_private_quality(device, quality)
+                # Notify
+                self.notify(device, value, stamp, quality)
             # Push events
             if not disable_event and self.event_enabled(device):
                 self.push_events(device, *self.get_value(device), diff=diff)

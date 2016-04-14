@@ -55,20 +55,27 @@ class local_attribute(class_object):
     Local attributes support the standard attribute keywords.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, callback=None, **kwargs):
         """Init with tango attribute keywords."""
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
+        self.callback = callback
         self.method = None
         self.attr = None
         self.prop = None
         self.device = None
 
+    def notify(self, callback):
+        """To use as a decorator to register a callback."""
+        self.callback = callback
+        return callback
+
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         # Property
         prop = event_property(key, dtype=self.dtype, event="push_events",
-                              is_allowed=self.kwargs.get("fisallowed"))
+                              is_allowed=self.kwargs.get("fisallowed"),
+                              callback=self.callback)
         dct[attr_data_name(key)] = prop
         # Attribute
         dct[key] = attribute(fget=prop.read, **self.kwargs)
