@@ -536,19 +536,23 @@ class event_property(object):
         with self.get_lock(device):
             attr_name = self.get_attribute_name()
             attr = getattr(device, attr_name)
-            if diff :
-                # push change event
+            # Change events
+            if diff:
                 if not attr.is_change_event():
                     attr.set_change_event(True, False)
                 attr.set_value_date_quality(value, stamp, quality)
                 attr.fire_change_event()
-            # also push archive event
-            if not attr.is_archive_event():
-                # Enable verification of event properties
-                attr.set_archive_event(True, True)
-            device.push_archive_event(attr_name, value, stamp, quality)
 
+            # Do not push archive event until PyTango 8.1.9
+            # Then we'll be able to use the monitor lock to make
+            # safe event callbacks. There will be no reason to
+            # protect the code anymore and we'll be able to use
+            # device.push_change_event and device.push_archive_events.
 
+            # if not attr.is_archive_event():
+            #     # Enable verification of event properties
+            #     attr.set_archive_event(True, True)
+            #  device.push_archive_event(attr_name, value, stamp, quality)
 
 
 # Mapping object
