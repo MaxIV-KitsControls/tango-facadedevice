@@ -73,6 +73,7 @@ class local_attribute(class_object):
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
         self.callback = callback
+        self.errback = errback
         self.method = None
         self.attr = None
         self.prop = None
