@@ -53,10 +53,23 @@ class local_attribute(class_object):
     """Tango attribute with event support.
     It will also be available through the data dictionary.
     Local attributes support the standard attribute keywords.
+
+    Args:
+        callback (str or function): method to call when the attribute
+            changes. It is called with value, stamp and quality.
+        errback (str or function): method to call when the callback
+            fails. It is called with error, message and origin.
     """
 
     def __init__(self, callback=None, errback='ignore_exception', **kwargs):
-        """Init with tango attribute keywords."""
+        """Init with tango attribute keywords.
+
+        Args:
+            callback (str or function): method to call when the attribute
+                changes. It is called with value, stamp and quality.
+            errback (str or function): method to call when the callback
+                fails. It is called with error, message and origin.
+        """
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
         self.callback = callback
