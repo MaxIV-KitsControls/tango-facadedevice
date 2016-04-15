@@ -2,13 +2,17 @@
 
 # Imports
 import time
-import traceback
 from threading import RLock
 from collections import defaultdict
 from contextlib import contextmanager
+
+# Common imports
 from facadedevice.common import cache_during, debug_it, create_device_proxy
-from facadedevice.common import DeviceMeta, read_attributes, NONE_STRING
+from facadedevice.common import DeviceMeta, read_attributes, safe_traceback
 from facadedevice.common import tangocmd_exist, is_writable_attribute
+from facadedevice.common import NONE_STRING
+
+# Object imports
 from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
@@ -109,7 +113,7 @@ class Facade(Device):
     def register_exception(self, exc, msg="", origin=None, ignore=False):
         """Regsiter an exception and update the device properly."""
         # Stream traceback
-        self.debug_stream(traceback.format_exc().replace("%", "%%"))
+        self.debug_stream(safe_traceback())
         # Exception as a string
         try:
             exc = exc.desc
@@ -133,6 +137,10 @@ class Facade(Device):
         # Clear data dict
         self.clear_attributes(forced=(origin,))
         return status
+
+    def ignore_exception(self, exc, msg='', origin=None):
+        return self.register_exception(
+            exc, msg=msg, origin=origin, ignore=True)
 
     def recover_from(self, origin):
         """Recover from an error caused by the given origin."""
