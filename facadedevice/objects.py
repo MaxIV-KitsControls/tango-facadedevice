@@ -53,22 +53,43 @@ class local_attribute(class_object):
     """Tango attribute with event support.
     It will also be available through the data dictionary.
     Local attributes support the standard attribute keywords.
+
+    Args:
+        callback (str or function): method to call when the attribute
+            changes. It is called with value, stamp and quality.
+        errback (str or function): method to call when the callback
+            fails. It is called with error, message and origin.
     """
 
-    def __init__(self, **kwargs):
-        """Init with tango attribute keywords."""
+    def __init__(self, callback=None, errback='ignore_exception', **kwargs):
+        """Init with tango attribute keywords.
+
+        Args:
+            callback (str or function): method to call when the attribute
+                changes. It is called with value, stamp and quality.
+            errback (str or function): method to call when the callback
+                fails. It is called with error, message and origin.
+        """
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
+        self.callback = callback
+        self.errback = errback
         self.method = None
         self.attr = None
         self.prop = None
         self.device = None
 
+    def notify(self, callback):
+        """To use as a decorator to register a callback."""
+        self.callback = callback
+        return callback
+
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         # Property
         prop = event_property(key, dtype=self.dtype, event="push_events",
-                              is_allowed=self.kwargs.get("fisallowed"))
+                              is_allowed=self.kwargs.get("fisallowed"),
+                              callback=self.callback, errback=self.errback)
         dct[attr_data_name(key)] = prop
         # Attribute
         dct[key] = attribute(fget=prop.read, **self.kwargs)

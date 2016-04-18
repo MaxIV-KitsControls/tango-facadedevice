@@ -7,6 +7,7 @@ import weakref
 import threading
 import functools
 import itertools
+import traceback
 import collections
 
 # PyTango imports
@@ -41,6 +42,11 @@ def gettid():
             return threading.current_thread().ident
         if tid != -1:
             return tid
+
+
+# Safer traceback
+def safe_traceback(limit=None):
+    return traceback.format_exc(limit=limit).replace("%", "%%")
 
 
 # Debug it decorator
@@ -289,10 +295,13 @@ class event_property(object):
     VALID = AttrQuality.ATTR_VALID
 
     def __init__(self, attribute, default=None, invalid=None,
-                 is_allowed=None, event=True, dtype=None, doc=None):
+                 is_allowed=None, event=True, dtype=None,
+                 callback=None, errback=None, doc=None):
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
+        self.callback = callback
+        self.errback = errback
         self.event = event
         self.dtype = dtype if callable(dtype) else None
         self.__doc__ = doc
@@ -331,6 +340,33 @@ class event_property(object):
         if self.event and isinstance(self.event, basestring):
             return getattr(device, self.event)
         return self.event
+
+    def notify(self, device, args, err=False):
+        callback = self.errback if err else self.callback
+        if not callback:
+            return
+        # Prepare callback
+        if isinstance(callback, basestring):
+            callback = getattr(device, callback, None)
+        else:
+            callback = functools.partial(callback, device)
+        # Run callback
+        try:
+            callback(*args)
+        # Handle exception
+        except Exception as exc:
+            # Message formatting
+            origin = self.get_attribute_name()
+            name = "error callback" if err else "callback"
+            msg = "Exception while running {} for attribute {}: {!r}"
+            msg = msg.format(name, origin, exc)
+            # Use errback
+            if not err and self.errback:
+                self.notify(device, (exc, msg, origin), err=True)
+            # Default handling
+            else:
+                device.error_stream(msg)
+                device.debug_stream(safe_traceback())
 
     def get_private_value(self, device):
         name = "__" + self.get_attribute_name() + "_value"
@@ -501,6 +537,8 @@ class event_property(object):
             self.set_private_value(device, value)
             self.set_private_stamp(device, stamp)
             self.set_private_quality(device, quality)
+            # Notify
+            self.notify(device, (value, stamp, quality))
         # Push events
         if not disable_event and self.event_enabled(device):
             self.push_events(device, *self.get_value(device), diff=diff)
