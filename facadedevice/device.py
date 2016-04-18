@@ -528,14 +528,14 @@ class Facade(Device):
         if force or self.connected:
             Device.set_state(self, state)
         if self.push_events:
-            self.push_change_events('State')
+            self.push_change_event('State')
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
         if force or self.connected:
             Device.set_status(self, status)
         if self.push_events:
-            self.push_change_events('Status')
+            self.push_change_event('Status')
 
     # Device properties
 

@@ -13,7 +13,7 @@ import collections
 import PyTango
 from PyTango import server
 from PyTango import AttrQuality, AttReqType, AttrWriteType
-from PyTango import CmdArgType, DevFailed
+from PyTango import DevFailed
 
 # Numpy print options
 try:
@@ -304,7 +304,6 @@ class event_property(object):
 
     def __init__(self, attribute, default=None, invalid=None,
                  is_allowed=None, event=True, dtype=None, doc=None):
-        self.lock_cache = weakref.WeakKeyDictionary()
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
@@ -315,9 +314,6 @@ class event_property(object):
         self.is_allowed = is_allowed or default
 
     # Helper
-
-    def get_lock(self, device):
-        return self.lock_cache.setdefault(device, threading.RLock())
 
     def debug_stream(self, device, action, value):
         if not getattr(device, 'HeavyLogging', False):
@@ -479,15 +475,14 @@ class event_property(object):
 
     def get_value(self, device, attr=None):
         # Get value
-        with self.get_lock(device):
-            try:
-                value = self.get_private_value(device)
-                stamp = self.get_private_stamp(device)
-                quality = self.get_private_quality(device)
-            except AttributeError:
-                value = self.get_default_value(device)
-                stamp = time.time()
-                quality = self.get_default_quality()
+        try:
+            value = self.get_private_value(device)
+            stamp = self.get_private_stamp(device)
+            quality = self.get_private_quality(device)
+        except AttributeError:
+            value = self.get_default_value(device)
+            stamp = time.time()
+            quality = self.get_default_quality()
         # Set value
         if attr:
             attr.set_value_date_quality(value, stamp, quality)
@@ -499,31 +494,30 @@ class event_property(object):
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
         self.debug_stream(device, 'setting', value)
-        with self.get_lock(device):
-            # Prepare
-            old_value, old_stamp, old_quality = self.get_value(device)
-            if value is None:
-                value = old_value
-            if stamp is None:
-                stamp = time.time()
-            if quality is None and value is not None:
-                quality = self.VALID
-            elif quality is None:
-                quality = old_quality
-            # Test differences
-            diff = old_quality != quality or old_value != value
-            try:
-                bool(diff)
-            except ValueError:
-                diff = diff.any()
-            if diff:
-                # Set
-                self.set_private_value(device, value)
-                self.set_private_stamp(device, stamp)
-                self.set_private_quality(device, quality)
-            # Push events
-            if not disable_event and self.event_enabled(device):
-                self.push_events(device, *self.get_value(device), diff=diff)
+        # Prepare
+        old_value, old_stamp, old_quality = self.get_value(device)
+        if value is None:
+            value = old_value
+        if stamp is None:
+            stamp = time.time()
+        if quality is None and value is not None:
+            quality = self.VALID
+        elif quality is None:
+            quality = old_quality
+        # Test differences
+        diff = old_quality != quality or old_value != value
+        try:
+            bool(diff)
+        except ValueError:
+            diff = diff.any()
+        if diff:
+            # Set
+            self.set_private_value(device, value)
+            self.set_private_stamp(device, stamp)
+            self.set_private_quality(device, quality)
+        # Push events
+        if not disable_event and self.event_enabled(device):
+            self.push_events(device, *self.get_value(device), diff=diff)
 
     # Aliases
 
@@ -533,26 +527,18 @@ class event_property(object):
     # Event methods
 
     def push_events(self, device, value, stamp, quality, diff=True):
-        with self.get_lock(device):
-            attr_name = self.get_attribute_name()
-            attr = getattr(device, attr_name)
-            # Change events
-            if diff:
-                if not attr.is_change_event():
-                    attr.set_change_event(True, False)
-                attr.set_value_date_quality(value, stamp, quality)
-                attr.fire_change_event()
-
-            # Do not push archive event until PyTango 8.1.9
-            # Then we'll be able to use the monitor lock to make
-            # safe event callbacks. There will be no reason to
-            # protect the code anymore and we'll be able to use
-            # device.push_change_event and device.push_archive_events.
-
-            # if not attr.is_archive_event():
-            #     # Enable verification of event properties
-            #     attr.set_archive_event(True, True)
-            #  device.push_archive_event(attr_name, value, stamp, quality)
+        attr_name = self.get_attribute_name()
+        attr = getattr(device, attr_name)
+        # Change events
+        if diff:
+            if not attr.is_change_event():
+                attr.set_change_event(True, False)
+            device.push_change_event(attr_name, value, stamp, quality)
+        # Archive events
+        if not attr.is_archive_event():
+            # Enable verification of event properties
+            attr.set_archive_event(True, True)
+        device.push_archive_event(attr_name, value, stamp, quality)
 
 
 # Mapping object
