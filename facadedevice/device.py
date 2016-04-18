@@ -5,14 +5,19 @@ import time
 import traceback
 from collections import defaultdict
 from contextlib import contextmanager
+
+# Common imports
 from facadedevice.common import cache_during, debug_it, create_device_proxy
-from facadedevice.common import DeviceMeta, read_attributes, NONE_STRING
+from facadedevice.common import Device, DeviceMeta, read_attributes
 from facadedevice.common import tangocmd_exist, is_writable_attribute
+from facadedevice.common import NONE_STRING
+
+# Objet imports
 from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
-from PyTango.server import Device, device_property, command
+from PyTango.server import device_property, command
 from PyTango import DevFailed, DevState, EventType, EventData
 
 
@@ -218,7 +223,7 @@ class Facade(Device):
         self._data_dict = attribute_mapping(self)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
-            self.get_device_properties()
+            super(Facade, self).init_device()  # get device properties
             self.configure_events()
         # Invalid property case
         if self.get_state() != DevState.INIT:

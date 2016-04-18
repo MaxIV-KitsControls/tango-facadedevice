@@ -1,19 +1,19 @@
 """Provide generic decorators."""
 
 # Imports
-import sys
 import time
 import ctypes
 import weakref
 import threading
 import functools
+import itertools
 import collections
 
 # PyTango imports
 import PyTango
 from PyTango import server
-from PyTango import AttrQuality, AttReqType, AttrWriteType
-from PyTango import DevFailed
+from PyTango.server import DeviceMeta
+from PyTango import AttrQuality, AttReqType, AttrWriteType, DevFailed
 
 # Numpy print options
 try:
@@ -112,20 +112,6 @@ def read_attributes(proxy, attributes):
     return [mapping[attr] for attr in attributes]
 
 
-# Tango objects
-def is_tango_object(arg):
-    """Return tango data if the argument is a tango object,
-    False otherwise.
-    """
-    classes = server.attribute, server.device_property
-    if isinstance(arg, classes):
-        return arg
-    try:
-        return arg.__tango_command__
-    except AttributeError:
-        return False
-
-
 def is_writable_attribute(attr_name, device_proxy):
     """ Return if tango attribute exists and is writable, and also return
      string description """
@@ -161,67 +147,67 @@ def tangocmd_exist(cmd_name, device_proxy):
     return cmd_exists, desc
 
 
-# Run server class method
-@classmethod
-def run_server(cls, args=None, **kwargs):
-    """Run the class as a device server.
-    It is based on the PyTango.server.run method.
-
-    The difference is that the device class
-    and server name are automatically given.
-
-    Args:
-        args (iterable): args as given in the PyTango.server.run method
-                         without the server name. If None, the sys.argv
-                         list is used
-        kwargs: the other keywords argument are as given
-                in the PyTango.server.run method.
-    """
-    if not args:
-        args = sys.argv[1:]
-    args = [cls.__name__] + list(args)
-    return server.run((cls,), args, **kwargs)
-
-
-# Inheritance patch
-def inheritance_patch(attrs):
-    """Patch tango objects before they are processed."""
-    for key, obj in attrs.items():
-        if isinstance(obj, server.attribute):
-            if getattr(obj, 'attr_write', None) == AttrWriteType.READ_WRITE:
-                if not getattr(obj, 'fset', None):
-                    method_name = obj.write_method_name or "write_" + key
-                    obj.fset = attrs.get(method_name)
-
-
 # DeviceMeta metaclass
-def DeviceMeta(name, bases, attrs):
-    """Enhanced version of PyTango.server.DeviceMeta
-    that supports inheritance.
-    """
-    # Compatibility >= 8.1.8
-    if PyTango.__version_info__ >= (8, 1, 8):
-        return PyTango.server.DeviceMeta(name, bases, attrs)
-    # Attribute dictionary
-    dct = {"run_server": run_server}
-    # Filter object from bases
-    bases = tuple(base for base in bases if base != object)
-    # Add device to bases
-    if PyTango.server.Device not in bases:
-        bases += (PyTango.server.Device,)
-    # Set tango objects as attributes
-    for base in reversed(bases):
-        for key, value in base.__dict__.items():
-            if is_tango_object(value):
-                dct[key] = value
-    # Inheritance patch
-    inheritance_patch(attrs)
-    # Update attribute dictionary
-    dct.update(attrs)
-    # Create device class
-    cls = PyTango.server.DeviceMeta(name, bases, dct)
-    cls.TangoClassName = name
-    return cls
+class Device(server.Device):
+    """Enhanced version of server.Device"""
+    __metaclass__ = DeviceMeta
+
+    def init_device(self):
+        self.__event_dict = {}
+        self.__eid_counter = itertools.count(1)
+        super(Device, self).init_device()
+
+    def __wrap_callback(self, callback, eid):
+        def wrapped(event):
+            with PyTango.AutoTangoMonitor(self):
+                if eid in self.__event_dict:
+                    callback(event)
+        return wrapped
+
+    def subscribe_event(self, attr_name, event_type, callback,
+                        filters=[], stateless=False, proxy=None):
+        # Get proxy
+        if proxy is None:
+            device_name = '/'.join(attr_name.split('/')[:-1])
+            attr_name = attr_name.split('/')[-1]
+            proxy = PyTango.device_proxy(device_name)
+        # Create callback
+        eid = next(self.__eid_counter)
+        self.__event_dict[eid] = proxy, attr_name, None
+        wrapped = self.__wrap_callback(callback, eid)
+        # Subscribe
+        try:
+            proxy_eid = proxy.subscribe_event(
+                attr_name, event_type, wrapped, filters, stateless)
+        # Error
+        except Exception:
+            del self.__event_dict[eid]
+            raise
+        # Success
+        self.__event_dict[eid] = proxy, attr_name, proxy_eid
+        return eid
+
+    def unsubscribe_event(self, eid):
+        proxy, attr_name, proxy_eid = self.__event_dict.pop(eid)
+        proxy.unsubscribe_event(proxy_eid)
+
+    def delete_device(self):
+        # Unsubscribe from all attributes
+        for eid in list(self.__event_dict):
+            proxy, attr_name, proxy_eid = self.__event_dict[eid]
+            attr_name = '/'.join((proxy.dev_name(), attr_name))
+            try:
+                proxy.unsubscribe_event(eid)
+            except Exception as exc:
+                msg = "Cannot unsubscribe from attribute {0}: {1!r}"
+                msg = msg.format(attr_name, exc)
+                self.error_stream(msg)
+            else:
+                msg = "Successfully Unsubscribed from attribute {0}"
+                msg = msg.format(attr_name)
+                self.info_stream(msg)
+        # Call parent
+        super(Device, self).delete_device()
 
 
 # Catch KeyError decorator
