@@ -3,7 +3,6 @@
 # Imports
 import time
 import traceback
-from threading import RLock
 from collections import defaultdict
 from contextlib import contextmanager
 from facadedevice.common import cache_during, debug_it, create_device_proxy
@@ -125,9 +124,8 @@ class Facade(Device):
         # Ignore exception
         if ignore:
             return status
-        # Lock state and status by registering an exception
+        # Set state and status
         self._exception_origins.add(origin or exc)
-        # Safely set state and status
         self.set_status(status, force=True)
         self.set_state(DevState.FAULT, force=True)
         # Clear data dict
@@ -149,11 +147,6 @@ class Facade(Device):
 
     @debug_it
     def on_change_event(self, attr, event):
-        "Acquire the lock and handle attribute change events"
-        with self._update_lock:
-            return self.on_change_event_safe(attr, event)
-
-    def on_change_event_safe(self, attr, event):
         "Handle attribute change events"
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
@@ -207,8 +200,6 @@ class Facade(Device):
     def init_device(self):
         """Initialize the device."""
         # Init exception data structure
-        self._update_lock = RLock()
-        self._exception_lock = RLock()
         self._exception_origins = set()
         self._exception_history = defaultdict(int)
         # Initialize state
@@ -242,18 +233,7 @@ class Facade(Device):
     def delete_device(self):
         """Unsubscribe events and clear attributes values."""
         # Unsubscribe events
-        for proxy, attrs in self._evented_attrs.items():
-            for attr, (key, eid) in attrs.items():
-                try:
-                    proxy.unsubscribe_event(eid)
-                except Exception as exc:
-                    self.debug_stream(str(exc))
-                    msg = "Cannot unsubscribe from change event for attribute"
-                else:
-                    msg = "Unsubscribed from change event for attribute"
-                finally:
-                    msg += " {0}/{1}".format(proxy.dev_name(), attr)
-                    self.info_stream(msg)
+        super(Facade, self).delete_device()
         # Clear cache from cache decorator
         self.remote_update.pop_cache(self)
         # Clear internal attributes
@@ -396,11 +376,10 @@ class Facade(Device):
     def setup_listener(self, proxy, attr_dict):
         "Try to setup event listeners for all given attributes on a proxy"
         for attr, attr_proxy in attr_dict.items():
+            cb = lambda event, attr=attr: self.on_change_event(attr, event)
             try:
-                eid = proxy.subscribe_event(
-                    attr_proxy,
-                    EventType.CHANGE_EVENT,
-                    lambda event, attr=attr: self.on_change_event(attr, event))
+                eid = self.subscribe_event(
+                    attr_proxy, EventType.CHANGE_EVENT, cb, proxy=proxy)
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
@@ -485,12 +464,11 @@ class Facade(Device):
 
     def update_all(self):
         """Update all."""
-        with self._update_lock:
-            if not self.connected:
-                return
-            if self.require_attribute_polling:
-                self.remote_update()
-            self.local_update()
+        if not self.connected:
+            return
+        if self.require_attribute_polling:
+            self.remote_update()
+        self.local_update()
 
     # Properties
 
@@ -543,25 +521,21 @@ class Facade(Device):
             self.update_all()
         return Device.dev_state(self)
 
-    # State, status and lock
+    # State, status
 
     def set_state(self, state, force=False):
         """Set the state and push events if necessary."""
-        with self._exception_lock:
-            if force or self.connected:
-                Device.set_state(self, state)
-            if self.push_events:
-                state_attr = self.get_device_attr().get_attr_by_name('State')
-                state_attr.fire_change_event()
+        if force or self.connected:
+            Device.set_state(self, state)
+        if self.push_events:
+            self.push_change_events('State')
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
-        with self._exception_lock:
-            if force or self.connected:
-                Device.set_status(self, status)
-            if self.push_events:
-                status_attr = self.get_device_attr().get_attr_by_name('Status')
-                status_attr.fire_change_event()
+        if force or self.connected:
+            Device.set_status(self, status)
+        if self.push_events:
+            self.push_change_events('Status')
 
     # Device properties
 
