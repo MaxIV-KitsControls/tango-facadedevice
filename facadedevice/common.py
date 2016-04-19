@@ -105,7 +105,7 @@ def read_attributes(proxy, attributes):
     attributes = map(str.strip, map(str.lower, attributes))
     attrs = list(set(attributes))
     result = proxy.read_attributes(attrs)
-    for attr, res in zip(attributes, result):
+    for attr, res in zip(attrs, result):
         if not res.has_failed:
             continue
         try:
