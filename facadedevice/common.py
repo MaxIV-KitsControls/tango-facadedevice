@@ -205,7 +205,7 @@ def DeviceMeta(name, bases, attrs):
     that supports inheritance.
     """
     # Compatibility >= 8.1.8
-    if PyTango.__version_info__ >= (8, 1, 8):
+    if (8, 1, 8) <= PyTango.__version_info__ < (9, 0, 0):
         return PyTango.server.DeviceMeta(name, bases, attrs)
     # Attribute dictionary
     dct = {"run_server": run_server}
