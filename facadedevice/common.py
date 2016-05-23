@@ -375,7 +375,7 @@ class event_property(object):
             # Message formatting
             origin = self.get_attribute_name()
             name = "error callback" if err else "callback"
-            msg = "Exception while running {} for attribute {}: {!r}"
+            msg = "Exception while running {0} for attribute {1}: {2!r}"
             msg = msg.format(name, origin, exc)
             # Use errback
             if not err and self.errback:
