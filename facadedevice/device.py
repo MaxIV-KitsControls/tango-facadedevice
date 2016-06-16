@@ -66,7 +66,7 @@ class Facade(Device):
         if self.ensure_events:
             return
         for device, attr_dict in self._read_dict.items():
-            proxy = self._proxy_dict[device]
+            proxy = self._proxy_dict.get(device)
             if not proxy:
                 continue
             for attr, attr_proxy in attr_dict.items():
