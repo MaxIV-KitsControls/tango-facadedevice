@@ -106,7 +106,7 @@ def read_attributes(proxy, attributes):
     attributes = map(str.strip, map(str.lower, attributes))
     attrs = list(set(attributes))
     result = proxy.read_attributes(attrs)
-    for attr, res in zip(attributes, result):
+    for attr, res in zip(attrs, result):
         if not res.has_failed:
             continue
         try:
@@ -153,7 +153,7 @@ def tangocmd_exist(cmd_name, device_proxy):
     return cmd_exists, desc
 
 
-# DeviceMeta metaclass
+# Device class
 class Device(server.Device):
     """Enhanced version of server.Device"""
     __metaclass__ = DeviceMeta
@@ -358,7 +358,7 @@ class event_property(object):
             # Message formatting
             origin = self.get_attribute_name()
             name = "error callback" if err else "callback"
-            msg = "Exception while running {} for attribute {}: {!r}"
+            msg = "Exception while running {0} for attribute {1}: {2!r}"
             msg = msg.format(name, origin, exc)
             # Use errback
             if not err and self.errback:

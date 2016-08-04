@@ -65,7 +65,7 @@ class Facade(Device):
         if self.ensure_events:
             return
         for device, attr_dict in self._read_dict.items():
-            proxy = self._proxy_dict[device]
+            proxy = self._proxy_dict.get(device)
             if not proxy:
                 continue
             for attr, attr_proxy in attr_dict.items():
@@ -95,7 +95,7 @@ class Facade(Device):
         except exceptions as exc:
             if isinstance(exc, DevFailed) and exc.args:
                 exc = exc.args[0]
-            self.register_exception(exc, msg, ignore)
+            self.register_exception(exc, msg=msg, ignore=ignore)
 
     # Exception handling
 
@@ -159,7 +159,7 @@ class Facade(Device):
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event."
-            self.register_exception(event, msg)
+            self.register_exception(event, msg=msg)
             return
         # Format attribute name
         attr_name = '/'.join(event.attr_name.split('/')[-4:])
@@ -169,7 +169,7 @@ class Facade(Device):
             template = "Received an event from {0} that contains errors."
             msg = template.format(attr_name)
             ignore = getattr(exc, "reason", None) in self.reasons_to_ignore
-            self.register_exception(exc, msg, origin=attr, ignore=ignore)
+            self.register_exception(exc, msg=msg, origin=attr, ignore=ignore)
             return
         # Info stream
         msg = "Received a valid event from {0} for attribute {1}."
@@ -358,10 +358,9 @@ class Facade(Device):
                     err_msg = "- Command '{0}' failure: {1}\n"
                     errors += err_msg.format(cmd_name, desc)
         if errors:
-            self.register_exception(errors, "Proxy command errors:")
+            self.register_exception(errors, msg="Proxy command errors:")
         if warnings:
-            warning_title = "Proxy command warnings"
-            self.register_exception(warnings, warning_title, ignore=True)
+            self.ignore_exception(warnings, msg="Proxy command warnings:")
 
     # Setup listeners
 
@@ -437,21 +436,21 @@ class Facade(Device):
             self.safe_update(self._data_dict)
         except Exception as exc:
             msg = "Error while running safe_update."
-            self.register_exception(exc, msg, ignore=True)
+            self.ignore_exception(exc, msg=msg)
         # Update data
         for key, method in self._method_dict.items():
             try:
                 self._data_dict[key] = method(self._data_dict)
             except Exception as exc:
                 msg = "Error while updating attribute {0}.".format(key)
-                self.register_exception(exc, msg, ignore=True)
+                self.ignore_exception(exc, msg=msg)
                 self._data_dict[key] = None
         # Get state
         try:
             state = self.state_from_data(self._data_dict)
         except Exception as exc:
             msg = "Error while getting the device state."
-            self.register_exception(exc, msg)
+            self.register_exception(exc, msg=msg)
             return
         # Set state
         if state is not None:
@@ -461,7 +460,7 @@ class Facade(Device):
             status = self.status_from_data(self._data_dict)
         except Exception as exc:
             msg = "Error while getting the device status."
-            status = self.register_exception(exc, msg, ignore=True)
+            status = self.ignore_exception(exc, msg=msg)
         # Set status
         if status is not None:
             self.set_status(status)
