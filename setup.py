@@ -14,7 +14,7 @@ def safe_read(fname):
 
 # Setup
 setup(name="facadedevice",
-      version="0.7.2",
+      version="0.7.3",
       description="Provide a facade device to subclass.",
       author="Vincent Michel",
       author_email="vincent.michel@maxlab.lu.se",
