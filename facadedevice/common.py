@@ -203,7 +203,7 @@ class Device(server.Device):
             proxy, attr_name, proxy_eid = self.__event_dict[eid]
             attr_name = '/'.join((proxy.dev_name(), attr_name))
             try:
-                proxy.unsubscribe_event(eid)
+                proxy.unsubscribe_event(proxy_eid)
             except Exception as exc:
                 msg = "Cannot unsubscribe from attribute {0}: {1!r}"
                 msg = msg.format(attr_name, exc)
