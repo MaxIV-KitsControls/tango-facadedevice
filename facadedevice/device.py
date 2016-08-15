@@ -25,9 +25,9 @@ class Facade(Device):
     """Provide base methods for a facade device."""
     __metaclass__ = DeviceMeta
 
-    # Disable push_events by default
-    push_events = False
-    update_period = 0
+    # Ensure events by default
+    push_events = True
+    update_period = 0.0
 
     # Reasons to ignore for errors in events
     reasons_to_ignore = ["API_PollThreadOutOfSync"]
@@ -549,13 +549,13 @@ class Facade(Device):
     UpdatePeriod = device_property(
         dtype=float,
         doc="Set the refresh rate for polled attributes.",
-        default_value=0.0,
+        default_value=update_period,
         )
 
     PushEvents = device_property(
         dtype=bool,
         doc="Enable change events for all attributes.",
-        default_value=False,
+        default_value=push_events,
         )
 
     HeavyLogging = device_property(
