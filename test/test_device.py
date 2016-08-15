@@ -71,7 +71,8 @@ class ProxyTestCase(DeviceTestCase):
     """Test case for packet generation."""
 
     device = CameraScreen
-    properties = {"InCmdTag":     "tag1",
+    properties = {"PushEvents":   "False",
+                  "InCmdTag":     "tag1",
                   "OutCmdTag":    "tag2",
                   "InStatusTag":  "tag3",
                   "OutStatusTag": "tag4",
@@ -167,5 +168,3 @@ No errors in history since
         status =  self.device.status()
         self.assertIn("command 'reset' failure: command", status)
         self.assertIn("doesn't exist", status)
-
-
