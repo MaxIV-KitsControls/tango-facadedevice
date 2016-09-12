@@ -235,8 +235,10 @@ class Facade(Device):
         self.init_data_structure()
         # Connection
         self.init_connection()
-        # Check proxy_commands attributes exist
-        self.check_proxy_commands()
+        # Continue only if there is no errors (device proxies may be not set)
+        if not self._exception_origins:
+            # Check proxy_commands attributes exist
+            self.check_proxy_commands()
 
     def delete_device(self):
         """Unsubscribe events and clear attributes values."""
@@ -336,27 +338,31 @@ class Facade(Device):
         errors = ""
         warnings = ""
         for cmd_name, cmd_args in self._command_dict.iteritems():
-            # unpack
-            attr_name, is_attr, cmd_value, _, _ = cmd_args
-            if attr_name.strip().lower() == NONE_STRING:
-                warn = "- Command '{0}' disabled: attribute is set to '{1}'\n"
-                warnings += warn.format(cmd_name, attr_name)
-                continue
-            proxy_name = self._device_dict[cmd_name]
-            device_proxy = self._proxy_dict[proxy_name]
-            if is_attr:
-                # proxy command writes in tango attribute
-                writable, desc = is_writable_attribute(attr_name, device_proxy)
-                if not writable:
-                    # attribute is not writable
-                    err_msg = "- Command '{0}' failure: {1}\n"
-                    errors += err_msg.format(cmd_name, desc)
-            else:
-                # proxy command is a forwarded command
-                cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
-                if not cmd_exists:
-                    err_msg = "- Command '{0}' failure: {1}\n"
-                    errors += err_msg.format(cmd_name, desc)
+            msg = "Cannot read from proxy"
+            with self.safe_context(DevFailed, msg):
+                # unpack
+                attr_name, is_attr, cmd_value, _, _ = cmd_args
+                if attr_name.strip().lower() == NONE_STRING:
+                    warn = "- Command '{0}' disabled: attribute is set to '{1}'"
+                    warn += "\n"
+                    warnings += warn.format(cmd_name, attr_name)
+                    continue
+                proxy_name = self._device_dict[cmd_name]
+                device_proxy = self._proxy_dict[proxy_name]
+                if is_attr:
+                    # proxy command writes in tango attribute
+                    writable, desc = is_writable_attribute(attr_name,
+                                                           device_proxy)
+                    if not writable:
+                        # attribute is not writable
+                        err_msg = "- Command '{0}' failure: {1}\n"
+                        errors += err_msg.format(cmd_name, desc)
+                else:
+                    # proxy command is a forwarded command
+                    cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
+                    if not cmd_exists:
+                        err_msg = "- Command '{0}' failure: {1}\n"
+                        errors += err_msg.format(cmd_name, desc)
         if errors:
             self.register_exception(errors, msg="Proxy command errors:")
         if warnings:
