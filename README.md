@@ -99,6 +99,28 @@ The package is unittested using `devicetest` and the example class given above.
 
 Statement coverage is currently greater than 84%.
 
+
+Documentation
+-------------
+
+This project has no documentation yet, but I'm pasting below some explainantions that should be refactored properly at some point:
+
+A Facade device has its own way of dealing with communication errors: any communication error with the proxies will cause the device to go to fault state, set all the forwarded/logical attributes with an INVALID quality (not the local attributes though), and prevent the execution of forwarded commands. The status should also be pretty explicit. Then the device is frozen and it won't update its state, status or attributes any more.
+
+Now, about recovering. The Facade device do not recover from communication error, unless they come from a change event. That means that if you want your device to reconnect automatically, you need the following configuration:
+
+- in the sub-devices, configure all the attributes to forward to push events (enable polling and set a threshold if necessary)
+- make sure everything is accessible when your first start the device (the device do not reconnect if it has never started)
+- check the report of the GetInfo command to make sure the facade device used subscription and not polling for all the attributes it forwards.
+
+It turns out there is a way to configure the device to ensure this recovering behavior: you need to set those properties:
+
+- PushEvent: True
+- UpdatePeriod: 0
+
+With this configuration, the device will go to FAULT if it is not able to subscribe to all the attributes. That also means there won't be any internal polling and the device will be fully "reactive".
+
+
 Contact
 -------
 
