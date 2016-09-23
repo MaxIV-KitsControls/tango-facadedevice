@@ -513,12 +513,12 @@ class event_property(object):
             bool(diff)
         except ValueError:
             diff = diff.any()
+        # Set the internals
+        self.set_private_value(device, value)
+        self.set_private_stamp(device, stamp)
+        self.set_private_quality(device, quality)
+        # Notify if necessary
         if diff:
-            # Set
-            self.set_private_value(device, value)
-            self.set_private_stamp(device, stamp)
-            self.set_private_quality(device, quality)
-            # Notify
             self.notify(device, (value, stamp, quality))
         # Push events
         if not disable_event and self.event_enabled(device):
