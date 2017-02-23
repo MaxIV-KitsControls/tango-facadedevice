@@ -2,9 +2,9 @@
 
 # Imports
 from mock import Mock
-from PyTango.server import command
+from tango.server import command
 from devicetest import DeviceTestCase
-from PyTango import DevState, DevFailed, AttrQuality, AttrWriteType
+from tango import DevState, DevFailed, AttrQuality, AttrWriteType
 
 # Proxy imports
 from facadedevice import Facade, FacadeMeta

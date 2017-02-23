@@ -6,8 +6,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 
 # Common imports
-from facadedevice.common import cache_during, debug_it, create_device_proxy
-from facadedevice.common import Device, DeviceMeta, read_attributes
+from facadedevice.common import debug_it, create_device_proxy
+from facadedevice.common import Device, DeviceMeta
 from facadedevice.common import tangocmd_exist, is_writable_attribute
 from facadedevice.common import safe_traceback, NONE_STRING
 
@@ -16,8 +16,8 @@ from facadedevice.objects import logical_attribute, block_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
-from PyTango.server import device_property, command
-from PyTango import DevFailed, DevState, EventType, EventData
+from tango.server import device_property, command
+from tango import DevFailed, DevState, EventType, EventData
 
 
 # Proxy device
@@ -26,7 +26,6 @@ class Facade(Device):
     __metaclass__ = DeviceMeta
 
     # Ensure events by default
-    push_events = True
     update_period = 0.0
 
     # Reasons to ignore for errors in events
@@ -35,19 +34,9 @@ class Facade(Device):
     # Helpers
 
     @property
-    def ensure_events(self):
-        """Events have to be used for all attributes."""
-        return self.push_events and self.update_period <= 0
-
-    @property
-    def limit_period(self):
-        """Limit the refresh rate for the remote update."""
-        return 0 if self.push_events else self.update_period
-
-    @property
     def poll_update_command(self):
         """Poll the update command to refresh values."""
-        return self.push_events and not self.ensure_events
+        return self.update_period <= 0
 
     @property
     def connected(self):
@@ -55,29 +44,10 @@ class Facade(Device):
         return not self._exception_origins
 
     @property
-    def require_attribute_polling(self):
-        """True if at least one attributes require polling."""
-        return any(self.polled_attributes)
-
-    @property
-    def polled_attributes(self):
-        """List polled attributes as (local name, proxy name)."""
-        if self.ensure_events:
-            return
-        for device, attr_dict in self._read_dict.items():
-            proxy = self._proxy_dict.get(device)
-            if not proxy:
-                continue
-            for attr, attr_proxy in attr_dict.items():
-                if attr_proxy not in self._evented_attrs[proxy]:
-                    attr_name = proxy.dev_name() + '/' + attr_proxy
-                    yield attr, attr_name
-
-    @property
     def evented_attributes(self):
         """List evented attributes as (local name, proxy name)."""
         for proxy, dct in self._evented_attrs.items():
-            for attr_proxy, (attr, eid) in dct.items():
+            for attr_proxy, attr in dct.items():
                 attr_name = proxy.dev_name() + '/' + attr_proxy
                 yield attr, attr_name
 
@@ -102,7 +72,8 @@ class Facade(Device):
     def clear_attributes(self, forced=()):
         """Clear attribute data, except for local and evented attributes.
 
-        Attributes in forced argument will be cleared in any case."""
+        Attributes in forced argument will be cleared in any case.
+        """
         evented = [attr for attr, attr_name in self.evented_attributes]
         for key, value in self._class_dict["attributes"].items():
             non_local = isinstance(value, logical_attribute)
@@ -149,13 +120,13 @@ class Facade(Device):
         Device.get_device_properties(self, cls)
         for key, value in self.device_property_list.items():
             if value[2] is None:
-                raise ValueError('missing property: ' + key)
+                raise ValueError('Missing property: ' + key)
 
     # Events handling
 
     @debug_it
     def on_change_event(self, attr, event):
-        "Handle attribute change events"
+        """Handle attribute change events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event."
@@ -185,12 +156,11 @@ class Facade(Device):
 
     def configure_events(self):
         """Configure events and update period from property."""
-        self.push_events = self.PushEvents
         self.update_period = self.UpdatePeriod
         # Enable push events for state and status
         if self.push_events:
-            self.set_change_event('State', True, True)
-            self.set_change_event('Status', True, True)
+            self.set_change_event('State', True, False)
+            self.set_change_event('Status', True, False)
         # Poll update command
         if self.poll_update_command:
             ms = int(1000 * self.update_period)
@@ -244,15 +214,8 @@ class Facade(Device):
         """Unsubscribe events and clear attributes values."""
         # Unsubscribe events
         super(Facade, self).delete_device()
-        # Clear cache from cache decorator
-        self.remote_update.pop_cache(self)
         # Clear internal attributes
         self._data_dict.clear()
-        # Disable events
-        try:
-            del self.push_events
-        except AttributeError:
-            pass
 
     def init_data_structure(self):
         """Initialize the internal data structures."""
@@ -295,7 +258,6 @@ class Facade(Device):
     def init_connection(self):
         """Initialize all connections."""
         self.create_proxies()
-        self.remote_update()
         self.local_update()
         self.setup_listeners()
 
@@ -391,48 +353,21 @@ class Facade(Device):
         for attr, attr_proxy in attr_dict.items():
             cb = lambda event, attr=attr: self.on_change_event(attr, event)
             try:
-                eid = self.subscribe_event(
+                self.subscribe_event(
                     attr_proxy, EventType.CHANGE_EVENT, cb, proxy=proxy)
             except DevFailed:
                 msg = "Can't subscribe to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
-                if self.ensure_events:
-                    raise
+                raise
             else:
-                self._evented_attrs[proxy][attr_proxy] = attr, eid
+                self._evented_attrs[proxy][attr_proxy] = attr
                 msg = "Subscribed to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
 
     # Update methods
 
-    @cache_during("limit_period", "debug_stream")
-    def remote_update(self):
-        """Update the attributes by reading from the proxies."""
-        # Connection error
-        if not self.connected:
-            return
-        # Try to access the proxy
-        msg = "Cannot read from proxy."
-        errors = DevFailed, TypeError, ValueError
-        with self.safe_context(errors, msg):
-            # Read data
-            for device, attr_dict in self._read_dict.items():
-                proxy = self._proxy_dict[device]
-                # Disabled proxy
-                if not proxy:
-                    continue
-                # Filter attribute dict
-                polled = dict((attr, attr_proxy)
-                              for attr, attr_proxy in attr_dict.items()
-                              if attr_proxy not in self._evented_attrs[proxy])
-                # Read attributes
-                values = polled and read_attributes(proxy, polled.values())
-                # Store data
-                for attr, value in zip(polled, values):
-                    self._data_dict[attr] = value
-
     @debug_it
-    def local_update(self):
+    def update(self):
         """Update logical attributes, state and status."""
         # Connection error
         if not self.connected:
@@ -475,14 +410,6 @@ class Facade(Device):
         """Safe update to overrride."""
         pass
 
-    def update_all(self):
-        """Update all."""
-        if not self.connected:
-            return
-        if self.require_attribute_polling:
-            self.remote_update()
-        self.local_update()
-
     # Properties
 
     @property
@@ -521,33 +448,18 @@ class Facade(Device):
         """Method to override."""
         return None
 
-    # Update device
-
-    def read_attr_hardware(self, attr):
-        """Update attributes."""
-        if not self.push_events:
-            self.update_all()
-
-    def dev_state(self):
-        """Update attributes and return the state."""
-        if not self.push_events:
-            self.update_all()
-        return Device.dev_state(self)
-
     # State, status
 
     def set_state(self, state, force=False):
         """Set the state and push events if necessary."""
         if force or self.connected:
             Device.set_state(self, state)
-        if self.push_events:
             self.push_change_event('State')
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
         if force or self.connected:
             Device.set_status(self, status)
-        if self.push_events:
             self.push_change_event('Status')
 
     # Device properties
@@ -556,12 +468,6 @@ class Facade(Device):
         dtype=float,
         doc="Set the refresh rate for polled attributes.",
         default_value=update_period,
-        )
-
-    PushEvents = device_property(
-        dtype=bool,
-        doc="Enable change events for all attributes.",
-        default_value=push_events,
         )
 
     HeavyLogging = device_property(
@@ -575,7 +481,7 @@ class Facade(Device):
     @command
     def Update(self):
         """Force the update of polled attributes."""
-        self.update_all()
+        self.update()
 
     @command(
         dtype_out=str,
@@ -591,44 +497,21 @@ class Facade(Device):
             lines.append("The device is currently stopped because of:")
             for origin in self._exception_origins:
                 lines.append(" - {0!r}".format(origin))
-        # Event sending
-        if self.push_events:
-            lines.append("It pushes change events.")
-        else:
-            lines.append("It does not push change events.")
         # Event subscription
         if any(self._evented_attrs.values()):
-            if self.ensure_events:
-                lines.append("It ensures the event subscribtion "
-                             "for all forwarded attributes:")
-            else:
-                lines.append("It subscribed to change event "
-                             "for the following attribute(s):")
+            lines.append("It subscribed to change event "
+                         "for the following attribute(s):")
             for local, remote in self.evented_attributes:
                 lines.append("- {0}: {1}".format(local, remote))
         else:
             lines.append("It didn't subscribe to any event.")
-        # Attribute polling
-        if self.require_attribute_polling:
-            lines.append("It is polling the following attribute(s):")
-            for local, remote in self.polled_attributes:
-                lines.append("- {0}: {1}".format(local, remote))
-        else:
-            lines.append("It doesn't poll any attribute from another device.")
         # Polling and caching
-        if self.limit_period > 0:
-            line = ("It limits the calls to other devices "
-                    "by caching the read values for {0:.3f} seconds.")
-            lines.append(line.format(self.limit_period))
-        elif self.poll_update_command:
-            line = ("It refreshes its contents by polling "
+        if self.poll_update_command:
+            line = ("It refreshes its content by polling "
                     "the update command every {0:.3f} seconds.")
             lines.append(line.format(self.update_period))
         elif self.push_events:
             lines.append("It doesn't rely on any polling.")
-        else:
-            lines.append("It doesn't use any caching "
-                         "to limit the calls the other devices.")
         # Exception history
         lines.append("-" * 5)
         strtime = time.ctime(self._init_stamp)
