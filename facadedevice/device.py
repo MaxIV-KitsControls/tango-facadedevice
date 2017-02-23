@@ -25,18 +25,10 @@ class Facade(Device):
     """Provide base methods for a facade device."""
     __metaclass__ = DeviceMeta
 
-    # Ensure events by default
-    update_period = 0.0
-
     # Reasons to ignore for errors in events
     reasons_to_ignore = ["API_PollThreadOutOfSync"]
 
     # Helpers
-
-    @property
-    def poll_update_command(self):
-        """Poll the update command to refresh values."""
-        return self.update_period <= 0
 
     @property
     def connected(self):
@@ -152,7 +144,7 @@ class Facade(Device):
         with self.safe_context(msg=msg.format(attr), ignore=True):
             self._data_dict[attr] = event.attr_value
         # Update
-        self.local_update()
+        self.update()
 
     def configure_events(self):
         """Configure events and update period from property."""
@@ -161,17 +153,6 @@ class Facade(Device):
         if self.push_events:
             self.set_change_event('State', True, False)
             self.set_change_event('Status', True, False)
-        # Poll update command
-        if self.poll_update_command:
-            ms = int(1000 * self.update_period)
-            self.poll_command("Update", ms)
-            return
-        # Don't poll update command
-        try:
-            self.stop_poll_command("Update")
-        except DevFailed as exc:
-            self.info_stream('Update command is already stopped')
-            self.debug_stream(str(exc))
 
     # Initialization
 
@@ -464,12 +445,6 @@ class Facade(Device):
 
     # Device properties
 
-    UpdatePeriod = device_property(
-        dtype=float,
-        doc="Set the refresh rate for polled attributes.",
-        default_value=update_period,
-        )
-
     HeavyLogging = device_property(
         dtype=bool,
         doc="Enable heavy logging.",
@@ -478,10 +453,6 @@ class Facade(Device):
 
     # Commands
 
-    @command
-    def Update(self):
-        """Force the update of polled attributes."""
-        self.update()
 
     @command(
         dtype_out=str,
@@ -505,13 +476,6 @@ class Facade(Device):
                 lines.append("- {0}: {1}".format(local, remote))
         else:
             lines.append("It didn't subscribe to any event.")
-        # Polling and caching
-        if self.poll_update_command:
-            line = ("It refreshes its content by polling "
-                    "the update command every {0:.3f} seconds.")
-            lines.append(line.format(self.update_period))
-        elif self.push_events:
-            lines.append("It doesn't rely on any polling.")
         # Exception history
         lines.append("-" * 5)
         strtime = time.ctime(self._init_stamp)
