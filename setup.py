@@ -13,18 +13,24 @@ def safe_read(fname):
         return ""
 
 # Setup
-setup(name="facadedevice",
-      version="0.8.1",
-      description="Provide a facade device to subclass.",
-      author="Vincent Michel",
-      author_email="vincent.michel@maxlab.lu.se",
-      license="GPLv3",
-      url="http://www.maxlab.lu.se",
-      long_description=safe_read("README.md"),
-      packages=['facadedevice'],
-      setup_requires=['nose', 'rpm2'],
-      install_requires=['pytango>=9.2.0'],
-      tests_require=['mock', 'python-devicetest'],
-      dependency_links=['git+https://github.com/vxgmichel/pytango-devicetest.git#egg=python-devicetest',
-                        'git+https://github.com/vxgmichel/setuptools-rpm2.git#egg=rpm2']
+setup(
+    name="facadedevice",
+    version="0.8.1",
+    packages=['facadedevice'],
+
+    # Metadata
+    description="Provide a facade device to subclass.",
+    author="Vincent Michel",
+    author_email="vincent.michel@maxlab.lu.se",
+    license="GPLv3",
+    url="http://www.maxlab.lu.se",
+    long_description=safe_read("README.md"),
+
+
+    # Requirements
+    setup_requires=['pytest-runner', 'rpm2'],
+    install_requires=['pytango>=9.2.1'],
+    tests_require=['mock', 'pytest-xdist'],
+    dependency_links=[
+        'git+https://github.com/vxgmichel/setuptools-rpm2.git#egg=rpm2'],
       )
