@@ -13,7 +13,6 @@ import collections
 # PyTango imports
 import PyTango
 from PyTango import server
-from PyTango.server import DeviceMeta
 from PyTango import AttrQuality, AttReqType, AttrWriteType, DevFailed
 
 # Numpy print options
@@ -21,7 +20,7 @@ try:
     import numpy
     numpy.set_printoptions(precision=5, threshold=6)
 except Exception:
-    print "Couldn't customize numpy print options"
+    print("Couldn't customize numpy print options")
 
 # Constants
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
@@ -137,7 +136,6 @@ def tangocmd_exist(cmd_name, device_proxy):
 # Device class
 class Device(server.Device):
     """Enhanced version of server.Device"""
-    __metaclass__ = DeviceMeta
 
     def init_device(self):
         self.__event_dict = {}

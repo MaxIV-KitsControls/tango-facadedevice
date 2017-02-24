@@ -6,42 +6,67 @@ from collections import defaultdict
 from contextlib import contextmanager
 
 # Common imports
-from facadedevice.common import debug_it, create_device_proxy
-from facadedevice.common import Device, DeviceMeta
-from facadedevice.common import tangocmd_exist, is_writable_attribute
-from facadedevice.common import safe_traceback, NONE_STRING
+from facadedevice.common import Device
+from facadedevice.common import safe_traceback, debug_it, event_property
 
 # Object imports
-from facadedevice.objects import logical_attribute, block_attribute
+from facadedevice.objects import logical_attribute
 from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
 from tango.server import device_property, command
-from tango import DevFailed, DevState, EventType, EventData
+from tango import DevFailed, DevState, EventData
+
+
+# Proxy metaclass
+class FacadeMeta(type(Device)):
+    """Metaclass for Facade device."""
+
+    def __new__(metacls, name, bases, dct):
+        # Class attribute
+        dct["_class_dict"] = class_dict = {
+            "attributes": {},
+            "commands":   {},
+            "devices":    {}}
+        # Inheritance
+        for base in reversed(bases):
+            try:
+                base_class_dict = base._class_dict
+            except AttributeError:
+                continue
+            # Copy _class_dict from the bases
+            for type_key, object_dict in class_dict.items():
+                for key, obj in base_class_dict[type_key].items():
+                    # Allow to remove facade objects by setting them to None
+                    if key not in dct:
+                        object_dict[key] = obj
+        # Proxy objects
+        for key, value in dct.items():
+            if isinstance(value, class_object):
+                value.update_class(key, dct)
+        # Update doc
+        update_docs(dct)
+        # Create device class
+        return type(Device).__new__(metacls, name, bases, dct)
+
+
+# Metaclassing manually for python compatibility
+_Facade = FacadeMeta('_Facade', (Device,), {})
 
 
 # Proxy device
-class Facade(Device):
+class Facade(_Facade):
     """Provide base methods for a facade device."""
-    __metaclass__ = DeviceMeta
 
     # Reasons to ignore for errors in events
     reasons_to_ignore = ["API_PollThreadOutOfSync"]
 
-    # Helpers
+    # Exception handling
 
     @property
     def connected(self):
         """Status of the connection with the proxies."""
         return not self._exception_origins
-
-    @property
-    def evented_attributes(self):
-        """List evented attributes as (local name, proxy name)."""
-        for proxy, dct in self._evented_attrs.items():
-            for attr_proxy, attr in dct.items():
-                attr_name = proxy.dev_name() + '/' + attr_proxy
-                yield attr, attr_name
 
     @contextmanager
     def safe_context(self, exceptions=Exception, msg="", ignore=False):
@@ -59,17 +84,13 @@ class Facade(Device):
                 exc = exc.args[0]
             self.register_exception(exc, msg=msg, ignore=ignore)
 
-    # Exception handling
-
     def clear_attributes(self, forced=()):
         """Clear attribute data, except for local and evented attributes.
 
         Attributes in forced argument will be cleared in any case.
         """
-        evented = [attr for attr, attr_name in self.evented_attributes]
         for key, value in self._class_dict["attributes"].items():
-            non_local = isinstance(value, logical_attribute)
-            if key in forced or non_local and key not in evented:
+            if key in forced or type(value) is logical_attribute:
                 del self._data_dict[key]
 
     def register_exception(self, exc, msg="", origin=None, ignore=False):
@@ -117,8 +138,8 @@ class Facade(Device):
     # Events handling
 
     @debug_it
-    def on_change_event(self, attr, event):
-        """Handle attribute change events."""
+    def on_event(self, attr, event):
+        """Handle attribute events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event."
@@ -146,14 +167,6 @@ class Facade(Device):
         # Update
         self.update()
 
-    def configure_events(self):
-        """Configure events and update period from property."""
-        self.update_period = self.UpdatePeriod
-        # Enable push events for state and status
-        if self.push_events:
-            self.set_change_event('State', True, False)
-            self.set_change_event('Status', True, False)
-
     # Initialization
 
     def init_device(self):
@@ -161,35 +174,27 @@ class Facade(Device):
         # Init exception data structure
         self._exception_origins = set()
         self._exception_history = defaultdict(int)
+        # Init events
+        self.set_change_event('State', True, False)
+        self.set_archive_event('State', True, True)
+        self.set_change_event('Status', True, False)
+        self.set_archive_event('Status', True, True)
+        # Init mappings
+        self._data_dict = attribute_mapping(self)
         # Initialize state
         self.set_state(DevState.INIT)
         self._init_stamp = time.time()
-        # Init mappings
-        self._tmp_dict = {}
-        self._proxy_dict = {}
-        self._device_dict = {}
-        self._method_dict = {}
-        self._command_dict = {}
-        self._evented_attrs = {}
-        self._attribute_dict = {}
-        self._read_dict = defaultdict(dict)
-        self._block_dict = defaultdict(dict)
-        self._data_dict = attribute_mapping(self)
         # Handle properties
         with self.safe_context((TypeError, ValueError, KeyError)):
             super(Facade, self).init_device()  # get device properties
-            self.configure_events()
         # Invalid property case
         if self.get_state() != DevState.INIT:
             return
-        # Data structure
-        self.init_data_structure()
         # Connection
-        self.init_connection()
-        # Continue only if there is no errors (device proxies may be not set)
-        if not self._exception_origins:
-            # Check proxy_commands attributes exist
-            self.check_proxy_commands()
+        with self.safe_context(DevFailed):
+            self.init_connection()
+        # Update
+        self.update()
 
     def delete_device(self):
         """Unsubscribe events and clear attributes values."""
@@ -198,152 +203,17 @@ class Facade(Device):
         # Clear internal attributes
         self._data_dict.clear()
 
-    def init_data_structure(self):
-        """Initialize the internal data structures."""
-        # Get informations for proxies
-        for device, value in self._class_dict["devices"].items():
-            proxy_name = getattr(self, value.device)
-            self._device_dict[device] = proxy_name
-        # Get informations for attributes
-        for attr, value in sorted(self._class_dict["attributes"].items()):
-            # Get attribute proxy name
-            if value.prop:
-                attr_name = getattr(self, value.prop)
-            else:
-                attr_name = value.attr
-            # Set up read dictionary
-            if attr_name and value.device:
-                proxy_name = self._device_dict[attr]
-                if attr_name.strip().lower() == NONE_STRING:
-                    pass
-                elif isinstance(value, block_attribute):
-                    self._block_dict[proxy_name][attr] = attr_name
-                    self._attribute_dict[attr] = attr_name + '*'
-                else:
-                    self._attribute_dict[attr] = attr_name
-                    self._read_dict[proxy_name][attr] = attr_name
-            # Set up method dictionary
-            if value.method:
-                self._method_dict[attr] = value.method.__get__(self)
-        # Get informations for commands
-        for cmd, value in self._class_dict["commands"].items():
-            # Get proxy name
-            if value.prop:
-                proxy_name = getattr(self, value.prop)
-            else:
-                proxy_name = value.attr or value.cmd
-            # Set up commad dict
-            self._command_dict[cmd] = (proxy_name, value.is_attr, value.value,
-                                       value.reset_value, value.reset_delay)
-
     def init_connection(self):
         """Initialize all connections."""
-        self.create_proxies()
-        self.local_update()
-        self.setup_listeners()
-
-    def create_proxies(self):
-        """Create the device proxies."""
-        # Connection error
-        if self._exception_origins:
-            return
-        # Create proxies
-        msg = "Cannot connect to proxy."
-        with self.safe_context(DevFailed, msg):
-            # Connect to proxies
-            for device in self._device_dict.values():
-                if device not in self._proxy_dict:
-                    if device.strip().lower() == NONE_STRING:
-                        proxy = None
-                    else:
-                        proxy = create_device_proxy(device)
-                        self.init_block_attributes(device, proxy)
-                    self._proxy_dict[device] = proxy
-                    self._evented_attrs[proxy] = {}
-
-    def init_block_attributes(self, device, proxy):
-        """Handle block attributes."""
-        if device not in self._block_dict:
-            return
-        remote_list = proxy.get_attribute_list()
-        for local, prefix in self._block_dict[device].items():
-            local_list = []
-            for remote in remote_list:
-                if remote.lower().startswith(prefix.lower()):
-                    name = local + '.' + remote[len(prefix):]
-                    self._read_dict[device][name] = remote
-                    self._data_dict.key_list.append(name)
-                    local_list.append(name)
-            self._block_dict[device][local] = local_list
-
-    def check_proxy_commands(self):
-        """ Check if proxy commands attributes exist and are writable. """
-        errors = ""
-        warnings = ""
-        for cmd_name, cmd_args in self._command_dict.iteritems():
-            msg = "Cannot read from proxy"
-            with self.safe_context(DevFailed, msg):
-                # unpack
-                attr_name, is_attr, cmd_value, _, _ = cmd_args
-                if attr_name.strip().lower() == NONE_STRING:
-                    warn = "- Command '{0}' disabled: attribute is set to '{1}'"
-                    warn += "\n"
-                    warnings += warn.format(cmd_name, attr_name)
-                    continue
-                proxy_name = self._device_dict[cmd_name]
-                device_proxy = self._proxy_dict[proxy_name]
-                if is_attr:
-                    # proxy command writes in tango attribute
-                    writable, desc = is_writable_attribute(attr_name,
-                                                           device_proxy)
-                    if not writable:
-                        # attribute is not writable
-                        err_msg = "- Command '{0}' failure: {1}\n"
-                        errors += err_msg.format(cmd_name, desc)
-                else:
-                    # proxy command is a forwarded command
-                    cmd_exists, desc = tangocmd_exist(attr_name, device_proxy)
-                    if not cmd_exists:
-                        err_msg = "- Command '{0}' failure: {1}\n"
-                        errors += err_msg.format(cmd_name, desc)
-        if errors:
-            self.register_exception(errors, msg="Proxy command errors:")
-        if warnings:
-            self.ignore_exception(warnings, msg="Proxy command warnings:")
-
-    # Setup listeners
-
-    def setup_listeners(self):
-        """Try to setup listeners for all attributes."""
-        # Connection error
-        if self._exception_origins:
-            return
-        # Setup listeners
-        msg = "Cannot subscribe to change event."
-        with self.safe_context(DevFailed, msg):
-            for device, attr_dict in self._read_dict.items():
-                proxy = self._proxy_dict[device]
-                # Diasbled proxy
-                if not proxy:
-                    continue
-                # Setup listener
-                self.setup_listener(proxy, attr_dict)
-
-    def setup_listener(self, proxy, attr_dict):
-        "Try to setup event listeners for all given attributes on a proxy"
-        for attr, attr_proxy in attr_dict.items():
-            cb = lambda event, attr=attr: self.on_change_event(attr, event)
-            try:
-                self.subscribe_event(
-                    attr_proxy, EventType.CHANGE_EVENT, cb, proxy=proxy)
-            except DevFailed:
-                msg = "Can't subscribe to change event for attribute {0}/{1}"
-                self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
-                raise
-            else:
-                self._evented_attrs[proxy][attr_proxy] = attr
-                msg = "Subscribed to change event for attribute {0}/{1}"
-                self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
+        # Get informations for proxies
+        for device, value in sorted(self._class_dict["devices"].items()):
+            value.init_connection(self)
+        # Get informations for attributes
+        for attr, value in sorted(self._class_dict["attributes"].items()):
+            value.init_connection(self)
+        # Get informations for commands
+        for cmd, value in sorted(self._class_dict["commands"].items()):
+            value.init_connection(self)
 
     # Update methods
 
@@ -360,13 +230,13 @@ class Facade(Device):
             msg = "Error while running safe_update."
             self.ignore_exception(exc, msg=msg)
         # Update data
-        for key, method in self._method_dict.items():
+        for attr, value in sorted(self._class_dict["attributes"].items()):
             try:
-                self._data_dict[key] = method(self._data_dict)
+                self._data_dict[attr] = value.update(self._data_dict)
             except Exception as exc:
-                msg = "Error while updating attribute {0}.".format(key)
+                msg = "Error while updating attribute {0}.".format(attr)
                 self.ignore_exception(exc, msg=msg)
-                self._data_dict[key] = None
+                self._data_dict[attr] = None
         # Get state
         try:
             state = self.state_from_data(self._data_dict)
@@ -398,27 +268,6 @@ class Facade(Device):
         """Data dictionary."""
         return self._data_dict
 
-    @property
-    def devices(self):
-        """The proxy dictionary."""
-        return dict((key, self._proxy_dict[value])
-                    for key, value in self._device_dict.items())
-
-    @property
-    def attributes(self):
-        """The attribute dictionary."""
-        return self._attribute_dict
-
-    @property
-    def commands(self):
-        """The command dictionary."""
-        return self._command_dict
-
-    @property
-    def methods(self):
-        """The command dictionary."""
-        return self._method_dict
-
     # Method to override
 
     def state_from_data(self, data):
@@ -434,14 +283,16 @@ class Facade(Device):
     def set_state(self, state, force=False):
         """Set the state and push events if necessary."""
         if force or self.connected:
-            Device.set_state(self, state)
-            self.push_change_event('State')
+            super(Facade, self).set_state(state)
+            self.push_change_event('State', state)
+            self.push_archive_event('State', state)
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
         if force or self.connected:
-            Device.set_status(self, status)
-            self.push_change_event('Status')
+            super(Facade, self).set_status(status)
+            self.push_change_event('Status', status)
+            self.push_archive_event('Status', status)
 
     # Device properties
 
@@ -452,7 +303,6 @@ class Facade(Device):
         )
 
     # Commands
-
 
     @command(
         dtype_out=str,
@@ -470,8 +320,8 @@ class Facade(Device):
                 lines.append(" - {0!r}".format(origin))
         # Event subscription
         if any(self._evented_attrs.values()):
-            lines.append("It subscribed to change event "
-                         "for the following attribute(s):")
+            lines.append("It subscribed to event channel "
+                         "of the following attribute(s):")
             for local, remote in self.evented_attributes:
                 lines.append("- {0}: {1}".format(local, remote))
         else:
@@ -491,36 +341,3 @@ class Facade(Device):
             lines.append(msg.format(strtime))
         # Return result
         return '\n'.join(lines)
-
-
-# Proxy metaclass
-def FacadeMeta(name, bases, dct):
-    """Metaclass for Facade device.
-
-    Return a FacadeMeta instance.
-    """
-    # Class attribute
-    dct["_class_dict"] = class_dict = {
-        "attributes": {},
-        "commands":   {},
-        "devices":    {}}
-    # Inheritance
-    for base in reversed(bases):
-        try:
-            base_class_dict = base._class_dict
-        except AttributeError:
-            continue
-        # Copy _class_dict from the bases
-        for type_key, object_dict in class_dict.items():
-            for key, obj in base_class_dict[type_key].items():
-                # Allow to remove facade objects by setting them to None
-                if key not in dct:
-                    object_dict[key] = obj
-    # Proxy objects
-    for key, value in dct.items():
-        if isinstance(value, class_object):
-            value.update_class(key, dct)
-    # Update doc
-    update_docs(dct)
-    # Create device class
-    return DeviceMeta(name, bases, dct)
