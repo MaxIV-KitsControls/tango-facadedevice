@@ -27,8 +27,8 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 NONE_STRING = "none"
 
 # Stamped tuple
-_stamped = collections.namedtuple("stamped", ("value", "stamp", "quality"))
-stamped = functools.partial(_stamped, quality=AttrQuality.ATTR_VALID)
+stamped = collections.namedtuple("stamped", ("value", "stamp", "quality"))
+stamped.__new__.__defaults__ = (AttrQuality.ATTR_VALID,)
 
 
 # TID helper
@@ -490,7 +490,7 @@ class event_property(object):
         # Stream
         self.debug_stream(device, 'getting', value)
         # Return
-        return value, stamp, quality
+        return stamped(value, stamp, quality)
 
     def set_value(self, device, value=None, stamp=None, quality=None,
                   disable_event=False):
