@@ -4,8 +4,8 @@
 import time
 from PyTango import AttrWriteType, CmdArgType
 from PyTango.server import device_property, attribute, command
-from facadedevice.common import event_property, mapping
-from facadedevice.common import NONE_STRING
+from facadedevice.common import event_property, mapping, stamped
+from facadedevice.common import aggregate_qualities, NONE_STRING
 
 # Constants
 PREFIX = ''
@@ -104,10 +104,59 @@ class logical_attribute(local_attribute):
     Logical attributes also support the standard attribute keywords.
     """
 
+    def __init__(self, *args, **kwargs):
+        self.bind = kwargs.pop('bind', ())
+        local_attribute.__init__(self, *args, **kwargs)
+        if self.method:
+            self.set_method(method, self.bind)
+
+    def set_method(self, method, bind=()):
+        """Decorator support."""
+        self.bind = bind
+        self.raw_method = method
+        self.method = lambda *args: self._update(*args)
+        return self
+
     def __call__(self, method):
         """Decorator support."""
-        self.method = method
+        self.set_method(method, self.bind)
         return self
+
+    def _update(self, device, data):
+        method = self.raw_method.__get__(device)
+        if not self.bind:
+            result = method(data)
+        else:
+            args = (data[attr] for attr in self.bind)
+            result = method(*args)
+        value, stamp, quality = event_property.unpack(result)
+        if stamp is None:
+            stamp = self.get_stamp(device)
+        if quality is None:
+            quality = self.get_quality(device)
+        return stamped(value, stamp, quality)
+
+    def get_stamp(self, device):
+        bind = self.bind
+        if not bind:
+            bind = [
+                attr
+                for attr, value in device._class_dict["attributes"].items()
+                if isinstance(value, proxy_attribute)]
+        if not bind:
+            return
+        names = map(attr_data_name, bind)
+        props = (getattr(type(device), name) for name in names)
+        stamps = (prop.get_value(device).stamp for prop in props)
+        return max(stamps)
+
+    def get_quality(self, device):
+        if not self.bind:
+            return
+        names = map(attr_data_name, self.bind)
+        props = (getattr(type(device), name) for name in names)
+        qualities = (prop.get_value(device).quality for prop in props)
+        return aggregate_qualities(qualities)
 
 
 # Proxy attribute object
