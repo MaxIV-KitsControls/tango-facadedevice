@@ -515,21 +515,25 @@ class event_property(object):
         elif quality is None:
             quality = old_quality
         # Test differences
-        diff = old_quality != quality or old_value != value
+        diff = (old_stamp != stamp or
+                old_quality != quality or
+                old_value != value)
         try:
             bool(diff)
         except ValueError:
             diff = diff.any()
+        # No changes
+        if not diff:
+            return
         # Set the internals
         self.set_private_value(device, value)
         self.set_private_stamp(device, stamp)
         self.set_private_quality(device, quality)
         # Notify if necessary
-        if diff:
-            self.notify(device, (value, stamp, quality))
+        self.notify(device, (value, stamp, quality))
         # Push events
         if not disable_event and self.event_enabled(device):
-            self.push_events(device, *self.get_value(device), diff=diff)
+            self.push_events(device, *self.get_value(device))
 
     # Aliases
 
@@ -538,14 +542,13 @@ class event_property(object):
 
     # Event methods
 
-    def push_events(self, device, value, stamp, quality, diff=True):
+    def push_events(self, device, value, stamp, quality):
         attr_name = self.get_attribute_name()
         attr = getattr(device, attr_name)
         # Change events
-        if diff:
-            if not attr.is_change_event():
-                attr.set_change_event(True, False)
-            device.push_change_event(attr_name, value, stamp, quality)
+        if not attr.is_change_event():
+            attr.set_change_event(True, False)
+        device.push_change_event(attr_name, value, stamp, quality)
         # Archive events
         if not attr.is_archive_event():
             # Enable verification of event properties
