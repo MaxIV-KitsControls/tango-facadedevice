@@ -49,6 +49,15 @@ def safe_traceback(limit=None):
     return traceback.format_exc(limit=limit).replace("%", "%%")
 
 
+# Aggregate qualities
+def aggregate_qualities(qualities):
+    length = len(AttrQuality.values)
+    t1 = lambda x: (int(x) - 1) % length
+    t2 = lambda x: (int(x) + 1) % length
+    result = t2(min(map(t1, qualities)))
+    return AttrQuality.values[result]
+
+
 # Debug it decorator
 def debug_it(func):
     @functools.wraps(func)
