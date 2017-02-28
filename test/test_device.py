@@ -131,7 +131,7 @@ class ProxyTestCase(DeviceTestCase):
         # Info command
         expected = """\
 The device is currently connected.
-It does not push change events.
+It does not push change nor archive events.
 It didn't subscribe to any event.
 It is polling the following attribute(s):
 - StatusOut: some/device/name/tag4
