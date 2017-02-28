@@ -77,9 +77,9 @@ class Facade(Device):
     def evented_attributes(self):
         """List evented attributes as (local name, proxy name)."""
         for proxy, dct in self._evented_attrs.items():
-            for attr_proxy, (attr, eid) in dct.items():
+            for attr_proxy, (attr, event_type) in dct.items():
                 attr_name = proxy.dev_name() + '/' + attr_proxy
-                yield attr, attr_name
+                yield attr, attr_name, event_type
 
     @contextmanager
     def safe_context(self, exceptions=Exception, msg="", ignore=False):
@@ -103,7 +103,7 @@ class Facade(Device):
         """Clear attribute data, except for local and evented attributes.
 
         Attributes in forced argument will be cleared in any case."""
-        evented = [attr for attr, attr_name in self.evented_attributes]
+        evented = [attr for attr, _, _ in self.evented_attributes]
         for key, value in self._class_dict["attributes"].items():
             non_local = isinstance(value, logical_attribute)
             if key in forced or non_local and key not in evented:
@@ -154,8 +154,8 @@ class Facade(Device):
     # Events handling
 
     @debug_it
-    def on_change_event(self, attr, event):
-        "Handle attribute change events"
+    def on_event(self, attr, event):
+        """Handle attribute events"""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event."
@@ -189,8 +189,12 @@ class Facade(Device):
         self.update_period = self.UpdatePeriod
         # Enable push events for state and status
         if self.push_events:
-            self.set_change_event('State', True, True)
-            self.set_change_event('Status', True, True)
+            # Change events
+            self.set_change_event('State', True, False)
+            self.set_change_event('Status', True, False)
+            # Archive events
+            self.set_archive_event('State', True, True)
+            self.set_archive_event('Status', True, True)
         # Poll update command
         if self.poll_update_command:
             ms = int(1000 * self.update_period)
@@ -376,7 +380,7 @@ class Facade(Device):
         if self._exception_origins:
             return
         # Setup listeners
-        msg = "Cannot subscribe to change event."
+        msg = "Cannot subscribe to event channel."
         with self.safe_context(DevFailed, msg):
             for device, attr_dict in self._read_dict.items():
                 proxy = self._proxy_dict[device]
@@ -389,17 +393,27 @@ class Facade(Device):
     def setup_listener(self, proxy, attr_dict):
         "Try to setup event listeners for all given attributes on a proxy"
         for attr, attr_proxy in attr_dict.items():
-            cb = lambda event, attr=attr: self.on_change_event(attr, event)
+            cb = lambda event, attr=attr: self.on_event(attr, event)
             try:
-                eid = self.subscribe_event(
+                self.subscribe_event(
                     attr_proxy, EventType.CHANGE_EVENT, cb, proxy=proxy)
             except DevFailed:
-                msg = "Can't subscribe to change event for attribute {0}/{1}"
-                self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
-                if self.ensure_events:
-                    raise
+                try:
+                    self.subscribe_event(
+                        attr_proxy, EventType.PERIODIC_EVENT, cb, proxy=proxy)
+                except DevFailed:
+                    msg = "Can't subscribe to event for attribute {0}/{1}"
+                    self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
+                    if self.ensure_events:
+                        raise
+                else:
+                    event_type = EventType.PERIODIC_EVENT
+                    self._evented_attrs[proxy][attr_proxy] = attr, event_type
+                    msg = "Subscribed to periodic event for attribute {0}/{1}"
+                    self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
             else:
-                self._evented_attrs[proxy][attr_proxy] = attr, eid
+                event_type = EventType.CHANGE_EVENT
+                self._evented_attrs[proxy][attr_proxy] = attr, event_type
                 msg = "Subscribed to change event for attribute {0}/{1}"
                 self.info_stream(msg.format(proxy.dev_name(), attr_proxy))
 
@@ -542,6 +556,7 @@ class Facade(Device):
             Device.set_state(self, state)
         if self.push_events:
             self.push_change_event('State')
+            self.push_archive_event('State')
 
     def set_status(self, status, force=False):
         """Set the status and push events if necessary."""
@@ -549,6 +564,7 @@ class Facade(Device):
             Device.set_status(self, status)
         if self.push_events:
             self.push_change_event('Status')
+            self.push_archive_event('Status')
 
     # Device properties
 
@@ -560,7 +576,7 @@ class Facade(Device):
 
     PushEvents = device_property(
         dtype=bool,
-        doc="Enable change events for all attributes.",
+        doc="Enable change and archive events for all attributes.",
         default_value=push_events,
         )
 
@@ -593,19 +609,19 @@ class Facade(Device):
                 lines.append(" - {0!r}".format(origin))
         # Event sending
         if self.push_events:
-            lines.append("It pushes change events.")
+            lines.append("It pushes change and archive events.")
         else:
-            lines.append("It does not push change events.")
+            lines.append("It does not push change nor archive events.")
         # Event subscription
         if any(self._evented_attrs.values()):
             if self.ensure_events:
                 lines.append("It ensures the event subscribtion "
                              "for all forwarded attributes:")
             else:
-                lines.append("It subscribed to change event "
+                lines.append("It subscribed to event channel "
                              "for the following attribute(s):")
-            for local, remote in self.evented_attributes:
-                lines.append("- {0}: {1}".format(local, remote))
+            for local, remote, etype in self.evented_attributes:
+                lines.append("- {0}: {1} ({2})".format(local, remote, etype))
         else:
             lines.append("It didn't subscribe to any event.")
         # Attribute polling
