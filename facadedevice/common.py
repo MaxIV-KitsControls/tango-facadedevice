@@ -21,7 +21,7 @@ try:
     import numpy
     numpy.set_printoptions(precision=5, threshold=6)
 except Exception:
-    print "Couldn't customize numpy print options"
+    print("Couldn't customize numpy print options")
 
 # Constants
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
