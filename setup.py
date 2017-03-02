@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 
 # Imports
-import os
+import sys
 from setuptools import setup
+
+# Arguments
+TESTING = any(x in sys.argv for x in ['test', 'pytest'])
 
 
 # Read function
 def safe_read(fname):
     try:
-        return open(os.path.join(os.path.dirname(__file__), fname)).read()
+        return open(fname).read()
     except IOError:
         return ""
 
@@ -28,9 +31,7 @@ setup(
 
 
     # Requirements
-    setup_requires=['pytest-runner', 'rpm2'],
     install_requires=['pytango>=9.2.1'],
-    tests_require=['mock', 'pytest-xdist'],
-    dependency_links=[
-        'git+https://github.com/vxgmichel/setuptools-rpm2.git#egg=rpm2'],
-      )
+    tests_require=['pytest', 'mock', 'pytest-xdist'],
+    setup_requires=['pytest-runner'] if TESTING else [],
+)
