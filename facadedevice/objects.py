@@ -32,22 +32,6 @@ class class_object(object):
         raise NotImplementedError
 
 
-# Proxy object
-class proxy(class_object):
-    """Tango DeviceProxy handled automatically by the Proxy device."""
-
-    def __init__(self, device=None):
-        """Initialize with the device property name."""
-        self.device = device
-
-    def update_class(self, key, dct):
-        """Register proxy and create device property."""
-        if not self.device:
-            self.device = key
-        dct["_class_dict"]["devices"][key] = self
-        dct[self.device] = device_property(dtype=str, doc="Proxy device.")
-
-
 # Local attribute object
 class local_attribute(class_object):
     """Tango attribute with event support.
@@ -160,7 +144,7 @@ class logical_attribute(local_attribute):
 
 
 # Proxy attribute object
-class proxy_attribute(logical_attribute, proxy):
+class proxy_attribute(local_attribute):
     """Tango attribute linked to the attribute of a remote device.
 
     Args:
@@ -194,11 +178,11 @@ class proxy_attribute(logical_attribute, proxy):
         Also supports the standard attribute keywords.
         """
         logical_attribute.__init__(self, **kwargs)
-        proxy.__init__(self, device)
         if not (attr or prop):
             raise ValueError(
                 "Either attr or prop argument has to be specified "
                 "to initialize a {0}".format(type(self).__name__))
+        self.device = device
         self.attr = attr
         self.prop = prop
 
@@ -209,7 +193,6 @@ class proxy_attribute(logical_attribute, proxy):
         """
         # Parent method
         logical_attribute.update_class(self, key, dct)
-        proxy.update_class(self, key, dct)
         # Create device property
         doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
         if self.prop:
@@ -316,7 +299,7 @@ class block_attribute(proxy_attribute):
 
 
 # Proxy command object
-class proxy_command(proxy):
+class proxy_command(class_object):
     """Command to write an attribute or run a command
     of a remote device with a given value.
 
@@ -404,7 +387,6 @@ class proxy_command(proxy):
         If dtype_out is defined, the command returns the result of the last
         sub-command, or the value of the attribute after it's been written.
         """
-        proxy.__init__(self, device)
         # Cast dtype
         if dtype_in == self.void:
             dtype_in = None
@@ -432,6 +414,7 @@ class proxy_command(proxy):
         self.dtype_out = kwargs['dtype_out'] = dtype_out
         self.kwargs = kwargs
         self.value = value
+        self.device = device
         self.cmd = cmd
         self.attr = attr
         self.prop = prop

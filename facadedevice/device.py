@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 # Common imports
 from facadedevice.common import Device
-from facadedevice.common import safe_traceback, debug_it, event_property
+from facadedevice.common import safe_traceback, debug_it
 
 # Object imports
 from facadedevice.objects import logical_attribute
