@@ -1,7 +1,8 @@
 """Contain the tests for proxy device server."""
 
 # Imports
-from mock import MagicMock
+from mock import Mock
+from collections import defaultdict
 
 from tango import DevState
 from tango.test_context import DeviceTestContext
@@ -11,11 +12,14 @@ from facadedevice import Facade
 
 
 def event_mock(cls):
-    change = cls.push_change_event = MagicMock()
-    archive = cls.push_archive_event = MagicMock()
-    change.side_effect = lambda key, *args, **kwargs: change[key](*args, **kwargs)
-    archive.side_effect = lambda key, *args, **kwargs: change[key](*args, **kwargs)
+    change = defaultdict(Mock)
+    archive = defaultdict(Mock)
+    cls.push_change_event = Mock(
+        side_effect=lambda key, *args, **kwargs: change[key](*args, **kwargs))
+    cls.push_archive_event = Mock(
+        side_effect=lambda key, *args, **kwargs: archive[key](*args, **kwargs))
     return change, archive
+
 
 def test_empty_device():
 
@@ -27,8 +31,8 @@ def test_empty_device():
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.INIT
         assert proxy.status() == "The device is in INIT state."
-        change_events['State'].called_with(DevState.INIT)
-        archive_events['State'].called_with(DevState.INIT)
+        change_events['State'].assert_called_with(DevState.INIT)
+        archive_events['State'].assert_called_with(DevState.INIT)
 
 
 def test_simple_device():
@@ -46,10 +50,10 @@ def test_simple_device():
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.ON
         assert proxy.status() == "It's ON!"
-        change_events['State'].called_with(DevState.ON)
-        archive_events['State'].called_with(DevState.ON)
-        change_events['Status'].called_with("It's ON!")
-        archive_events['Status'].called_with("It's ON!")
+        change_events['State'].assert_called_with(DevState.ON)
+        archive_events['State'].assert_called_with(DevState.ON)
+        change_events['Status'].assert_called_with("It's ON!")
+        archive_events['Status'].assert_called_with("It's ON!")
 
 
 def test_state_error():
@@ -65,10 +69,10 @@ def test_state_error():
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.FAULT
         assert proxy.status() == expected_status
-        change_events['State'].called_with(DevState.FAULT)
-        archive_events['State'].called_with(DevState.FAULT)
-        change_events['Status'].called_with(expected_status)
-        archive_events['Status'].called_with(expected_status)
+        change_events['State'].assert_called_with(DevState.FAULT)
+        archive_events['State'].assert_called_with(DevState.FAULT)
+        change_events['Status'].assert_called_with(expected_status)
+        archive_events['Status'].assert_called_with(expected_status)
 
 
 def test_status_error():
@@ -87,7 +91,7 @@ def test_status_error():
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.ON
         assert proxy.status() == expected_status
-        change_events['State'].called_with(DevState.ON)
-        archive_events['State'].called_with(DevState.ON)
-        change_events['Status'].called_with(expected_status)
-        archive_events['Status'].called_with(expected_status)
+        change_events['State'].assert_called_with(DevState.ON)
+        archive_events['State'].assert_called_with(DevState.ON)
+        change_events['Status'].assert_called_with(expected_status)
+        archive_events['Status'].assert_called_with(expected_status)

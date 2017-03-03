@@ -15,7 +15,7 @@ from facadedevice.objects import class_object, attribute_mapping, update_docs
 
 # PyTango
 from tango.server import device_property, command
-from tango import DevFailed, DevState, EventData
+from tango import DevFailed, DevState, EventData, EventType
 
 
 # Proxy metaclass
@@ -137,6 +137,29 @@ class Facade(_Facade):
 
     # Events handling
 
+    def subscribe(self, device, attr, origin):
+        callback = lambda event: self.on_event(origin, event)
+        fullattr = '/'.join((device, attr))
+        try:
+            self.subscribe_event(
+                fullattr, EventType.CHANGE_EVENT, callback)
+        except DevFailed:
+            try:
+                self.subscribe_event(
+                    fullattr, EventType.PERIODIC_EVENT, callback)
+            except DevFailed:
+                msg = "Can't subscribe to event for attribute {}"
+                self.info_stream(msg.format(fullattr))
+                raise
+            else:
+                msg = "Subscribed to periodic event for attribute {}"
+                self.info_stream(msg.format(fullattr))
+                return EventType.PERIODIC_EVENT
+        else:
+            msg = "Subscribed to change event for attribute {}"
+            self.info_stream(msg.format(fullattr))
+            return EventType.CHANGE_EVENT
+
     @debug_it
     def on_event(self, attr, event):
         """Handle attribute events."""
@@ -196,6 +219,7 @@ class Facade(_Facade):
         # Update
         self.update()
 
+    @debug_it
     def delete_device(self):
         """Unsubscribe events and clear attributes values."""
         # Unsubscribe events
@@ -231,6 +255,8 @@ class Facade(_Facade):
             self.ignore_exception(exc, msg=msg)
         # Update data
         for attr, value in sorted(self._class_dict["attributes"].items()):
+            if not hasattr(value, 'update'):
+                continue
             try:
                 self._data_dict[attr] = value.update(self._data_dict)
             except Exception as exc:

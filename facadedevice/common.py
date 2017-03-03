@@ -164,7 +164,7 @@ class Device(server.Device):
         if proxy is None:
             device_name = '/'.join(attr_name.split('/')[:-1])
             attr_name = attr_name.split('/')[-1]
-            proxy = PyTango.device_proxy(device_name)
+            proxy = create_device_proxy(device_name)
         # Create callback
         eid = next(self.__eid_counter)
         self.__event_dict[eid] = proxy, attr_name, None
@@ -283,14 +283,13 @@ class event_property(object):
     VALID = AttrQuality.ATTR_VALID
 
     def __init__(self, attribute, default=None, invalid=None,
-                 is_allowed=None, event=True, dtype=None,
+                 is_allowed=None, dtype=None,
                  callback=None, errback=None, doc=None):
         self.attribute = attribute
         self.default = default
         self.invalid = invalid
         self.callback = callback
         self.errback = errback
-        self.event = event
         self.dtype = dtype if callable(dtype) else None
         self.__doc__ = doc
         default = getattr(attribute, "is_allowed_name", "")
@@ -323,11 +322,6 @@ class event_property(object):
     def allowed(self, device):
         is_allowed = self.get_is_allowed_method(device)
         return not is_allowed or is_allowed(AttReqType.READ_REQ)
-
-    def event_enabled(self, device):
-        if self.event and isinstance(self.event, basestring):
-            return getattr(device, self.event)
-        return self.event
 
     def notify(self, device, args, err=False):
         callback = self.errback if err else self.callback
@@ -478,7 +472,7 @@ class event_property(object):
             self.set_value(device, quality=self.INVALID,
                            disable_event=reset)
         # Force events
-        if reset and self.event_enabled(device):
+        if reset:
             self.push_events(device, *self.get_value(device))
 
     # Private attribute access
@@ -532,7 +526,7 @@ class event_property(object):
         # Notify if necessary
         self.notify(device, (value, stamp, quality))
         # Push events
-        if not disable_event and self.event_enabled(device):
+        if not disable_event:
             self.push_events(device, *self.get_value(device))
 
     # Aliases

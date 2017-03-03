@@ -7,6 +7,7 @@ from PyTango.server import device_property, attribute, command
 from facadedevice.common import event_property, mapping, stamped
 from facadedevice.common import aggregate_qualities, NONE_STRING
 
+
 # Constants
 PREFIX = ''
 SUFFIX = '_data'
@@ -29,7 +30,7 @@ class class_object(object):
 
     def update_class(self, key, dct):
         """Method to override."""
-        raise NotImplementedError
+        self.key = key
 
 
 # Local attribute object
@@ -70,8 +71,9 @@ class local_attribute(class_object):
 
     def update_class(self, key, dct):
         """Create the attribute and read method."""
+        super(local_attribute, self).update_class(key, dct)
         # Property
-        prop = event_property(key, dtype=self.dtype, event="push_events",
+        prop = event_property(key, dtype=self.dtype,
                               is_allowed=self.kwargs.get("fisallowed"),
                               callback=self.callback, errback=self.errback)
         dct[attr_data_name(key)] = prop
@@ -177,7 +179,7 @@ class proxy_attribute(local_attribute):
         A ValueError is raised if neither of `prop` or `attr` is specified.
         Also supports the standard attribute keywords.
         """
-        logical_attribute.__init__(self, **kwargs)
+        local_attribute.__init__(self, **kwargs)
         if not (attr or prop):
             raise ValueError(
                 "Either attr or prop argument has to be specified "
@@ -192,8 +194,9 @@ class proxy_attribute(local_attribute):
         Also register useful informations in the property dictionary.
         """
         # Parent method
-        logical_attribute.update_class(self, key, dct)
+        local_attribute.update_class(self, key, dct)
         # Create device property
+        dct[self.device] = device_property(dtype=str, doc="Proxy device.")
         doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
         if self.prop:
             dct[self.prop] = device_property(dtype=str, doc=doc,
@@ -218,6 +221,21 @@ class proxy_attribute(local_attribute):
     def writable(self):
         return self.kwargs.get("access") == AttrWriteType.READ_WRITE or \
             set(self.kwargs) & set(["fwrite", "fset"])
+
+    # Device methods
+
+    def init_connection(self, device):
+        # Get properties
+        device_name = getattr(device, self.device)
+        if self.prop:
+            attr_name = getattr(device, self.prop)
+        else:
+            attr_name = self.attr
+        # Ignore attribure
+        if attr_name.strip().lower() == NONE_STRING:
+            return
+        # Subscribe
+        etype = device.subscribe(device_name, attr_name, self.key)
 
 
 # Block attribute object
