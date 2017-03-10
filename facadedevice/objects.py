@@ -2,9 +2,8 @@
 
 # Imports
 import time
-from PyTango import AttrWriteType, CmdArgType
-from PyTango.server import device_property, attribute, command
-from facadedevice.common import event_property, mapping, stamped
+from tango import AttrWriteType, CmdArgType
+from tango.server import device_property, command
 from facadedevice.common import aggregate_qualities, NONE_STRING
 
 
@@ -16,12 +15,6 @@ SUFFIX = '_data'
 # Attribute data name
 def attr_data_name(key):
     return PREFIX + key.lower() + SUFFIX
-
-
-# Attribute mapping
-def attribute_mapping(instance):
-    keys = list(instance._class_dict["attributes"])
-    return mapping(instance, attr_data_name, keys)
 
 
 # Base class object
@@ -72,14 +65,14 @@ class local_attribute(class_object):
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         super(local_attribute, self).update_class(key, dct)
-        # Property
-        prop = event_property(key, dtype=self.dtype,
-                              is_allowed=self.kwargs.get("fisallowed"),
-                              callback=self.callback, errback=self.errback)
-        dct[attr_data_name(key)] = prop
-        # Attribute
-        dct[key] = attribute(fget=prop.read, **self.kwargs)
-        dct["_class_dict"]["attributes"][key] = self
+        # # Property
+        # prop = event_property(key, dtype=self.dtype,
+        #                       is_allowed=self.kwargs.get("fisallowed"),
+        #                       callback=self.callback, errback=self.errback)
+        # dct[attr_data_name(key)] = prop
+        # # Attribute
+        # dct[key] = attribute(fget=prop.read, **self.kwargs)
+        # dct["_class_dict"]["attributes"][key] = self
 
 
 class logical_attribute(local_attribute):
@@ -195,27 +188,27 @@ class proxy_attribute(local_attribute):
         """
         # Parent method
         local_attribute.update_class(self, key, dct)
-        # Create device property
-        dct[self.device] = device_property(dtype=str, doc="Proxy device.")
-        doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
-        if self.prop:
-            dct[self.prop] = device_property(dtype=str, doc=doc,
-                                             default_value=self.attr)
-        # Read-only
-        if not self.writable:
-            return
-        # Custom write
-        if dct.get("is_" + key + "_allowed") or \
-           set(self.kwargs) & set(["fwrite", "fset"]):
-            return
+        # # Create device property
+        # dct[self.device] = device_property(dtype=str, doc="Proxy device.")
+        # doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
+        # if self.prop:
+        #     dct[self.prop] = device_property(dtype=str, doc=doc,
+        #                                      default_value=self.attr)
+        # # Read-only
+        # if not self.writable:
+        #     return
+        # # Custom write
+        # if dct.get("is_" + key + "_allowed") or \
+        #    set(self.kwargs) & set(["fwrite", "fset"]):
+        #     return
 
-        # Write method
-        def write(device, value):
-            proxy_name = device._device_dict[key]
-            device_proxy = device._proxy_dict[proxy_name]
-            proxy_attr = device._attribute_dict[key]
-            device_proxy.write_attribute(proxy_attr, value)
-        dct[key] = dct[key].setter(write)
+        # # Write method
+        # def write(device, value):
+        #     proxy_name = device._device_dict[key]
+        #     device_proxy = device._proxy_dict[proxy_name]
+        #     proxy_attr = device._attribute_dict[key]
+        #     device_proxy.write_attribute(proxy_attr, value)
+        # dct[key] = dct[key].setter(write)
 
     @property
     def writable(self):
@@ -283,7 +276,7 @@ class block_attribute(proxy_attribute):
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         proxy_attribute.update_class(self, key, dct)
-        self.method = self.make_method(key)
+        # self.method = self.make_method(key)
 
     def __call__(self, *args, **kwargs):
         raise TypeError("A block attribute cannot be used as a decorator")
@@ -519,18 +512,3 @@ class proxy_command(class_object):
             doc += "when command {1} is executed"
             dct[self.prop] = device_property(dtype=str, default_value=default,
                                              doc=doc.format(self.device, key))
-
-
-# Update docs function
-def update_docs(dct):
-    """Update the documentation for device properties."""
-    # Get attributes
-    attrs_dct = {}
-    for attr, value in dct["_class_dict"]["devices"].items():
-        if isinstance(value, proxy_attribute):
-            attrs_dct.setdefault(value.device, []).append(attr)
-    # Generate doc
-    for device, attrs in attrs_dct.items():
-        doc = 's ' + ', '.join(attrs[:-1]) + ' and ' if attrs[:-1] else ' '
-        doc = 'Proxy device for attribute{0}.'.format(doc + attrs[-1])
-        dct[device] = device_property(dtype=str, doc=doc)

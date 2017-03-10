@@ -303,8 +303,8 @@ class EnhancedDevice(Device):
 
     @command(
         dtype_out=str,
-        display_level=DispLevel.EXPERT,
-        doc_out="Information about polling and events.")
+        doc_out="Information about polling and events.",
+        display_level=DispLevel.EXPERT)
     def GetInfo(self):
         lines = []
         # Connection

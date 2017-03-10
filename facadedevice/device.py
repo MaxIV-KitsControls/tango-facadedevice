@@ -10,7 +10,7 @@ from facadedevice.base import triplet, Graph
 from facadedevice.common import EnhancedDevice, debug_it
 
 # Object imports
-from facadedevice.objects import class_object, update_docs, local_attribute
+from facadedevice.objects import class_object, local_attribute
 
 # Tango imports
 from tango.server import command
@@ -40,8 +40,6 @@ class FacadeMeta(type(EnhancedDevice)):
         for key, value in dct.items():
             if isinstance(value, class_object):
                 value.update_class(key, dct)
-        # Update doc
-        update_docs(dct)
         # Create device class
         return type(EnhancedDevice).__new__(metacls, name, bases, dct)
 
