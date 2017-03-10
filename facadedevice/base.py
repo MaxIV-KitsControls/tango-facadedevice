@@ -36,10 +36,15 @@ def assert_triplet(a):
         raise TypeError("The quality is not a integer")
 
 
+def from_attr_value(cls, attr_value):
+    return cls(attr_value.value, attr_value.time.totime(), attr_value.quality)
+
+
 triplet.__new__.__defaults__ = (VALID,)
 triplet.__eq__ = compare_triplet
 triplet.__ne__ = lambda self, arg: not self.__eq__(arg)
 triplet.__init__ = lambda self, *args: assert_triplet(self)
+triplet.from_attr_value = classmethod(from_attr_value)
 
 
 # Node object
