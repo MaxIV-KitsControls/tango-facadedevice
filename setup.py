@@ -32,6 +32,6 @@ setup(
 
     # Requirements
     install_requires=['pytango>=9.2.1'],
-    tests_require=['pytest', 'mock', 'pytest-xdist'],
+    tests_require=['pytest', 'pytest-mock', 'pytest-xdist'],
     setup_requires=['pytest-runner'] if TESTING else [],
 )

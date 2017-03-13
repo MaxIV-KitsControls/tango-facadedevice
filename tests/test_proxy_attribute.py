@@ -19,8 +19,7 @@ def test_ro_proxy_attribute():
 
         attr = proxy_attribute(
             dtype=float,
-            device='dev',
-            attr='d')
+            prop='prop')
 
     change_events, archive_events = event_mock(Test)
     common.create_device_proxy = Mock()
@@ -28,9 +27,9 @@ def test_ro_proxy_attribute():
     inner_proxy.dev_name.return_value = 'a/b/c'
     subscribe_event = inner_proxy.subscribe_event
 
-    with DeviceTestContext(Test, properties={'dev': 'a/b/c'}) as proxy:
+    with DeviceTestContext(Test, debug=5, properties={'prop': 'a/b/c/d'}) as proxy:
         # Device not in fault
-        assert proxy.state() == DevState.INIT
+        assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         common.create_device_proxy.assert_called_with('a/b/c')
         subscribe_event.assert_called()
@@ -49,7 +48,8 @@ def test_ro_proxy_attribute():
         event.attr_value.quality = AttrQuality.ATTR_ALARM
         cb(event)
         # Device not in fault
-        assert proxy.state() == DevState.INIT
+        assert proxy.state() == DevState.UNKNOWN
         # Check events
-        change_events['attr'].assert_called_with(1.2, 3.4, AttrQuality.ATTR_ALARM)
-        archive_events['attr'].assert_called_with(1.2, 3.4, AttrQuality.ATTR_ALARM)
+        expected = 1.2, 3.4, AttrQuality.ATTR_ALARM
+        change_events['attr'].assert_called_with(*expected)
+        archive_events['attr'].assert_called_with(*expected)
