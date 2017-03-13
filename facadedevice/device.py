@@ -36,8 +36,8 @@ class FacadeMeta(type(EnhancedDevice)):
                 # Allow to remove facade objects by setting them to None
                 if key not in dct:
                     class_dict[key] = obj
-        # Proxy objects
-        for key, value in dct.items():
+        # Process class objects
+        for key, value in list(dct.items()):
             if isinstance(value, class_object):
                 value.update_class(key, dct)
         # Create device class
@@ -65,30 +65,29 @@ class Facade(_Facade):
 
     # Events handling
 
-    def subscribe(self, device, attr, node):
-        fullattr = '/'.join((device, attr))
+    def subscribe(self, attr, node):
         try:
             self.subscribe_event(
-                fullattr,
+                attr,
                 EventType.CHANGE_EVENT,
                 lambda event: self.on_event(node, event))
         except DevFailed:
             try:
                 self.subscribe_event(
-                    fullattr,
+                    attr,
                     EventType.PERIODIC_EVENT,
                     lambda event: self.on_event(node, event))
             except DevFailed:
                 msg = "Can't subscribe to event for attribute {}"
-                self.info_stream(msg.format(fullattr))
+                self.info_stream(msg.format(attr))
                 raise
             else:
                 msg = "Subscribed to periodic event for attribute {}"
-                self.info_stream(msg.format(fullattr))
+                self.info_stream(msg.format(attr))
                 return EventType.PERIODIC_EVENT
         else:
             msg = "Subscribed to change event for attribute {}"
-            self.info_stream(msg.format(fullattr))
+            self.info_stream(msg.format(attr))
             return EventType.CHANGE_EVENT
 
     @debug_it
@@ -117,6 +116,22 @@ class Facade(_Facade):
         # Save
         value = triplet.from_attr_value(event.attr_value)
         node.set_result(value)
+
+    def push_event_for_node(self, node):
+        attr = getattr(self, node.name)
+        # Set events
+        if not attr.is_archive_event():
+            attr.set_archive_event(True, True)
+        if not attr.is_change_event():
+            attr.set_change_event(True, False)
+        # Exception
+        if node.exception() is not None:
+            self.push_change_event(node.name, node.exception())
+            self.push_archive_event(node.name, node.exception())
+        else:
+            value, stamp, quality = node.result()
+            self.push_change_event(node.name, value, stamp, quality)
+            self.push_archive_event(node.name, value, stamp, quality)
 
     # Initialization and cleanup
 
@@ -165,10 +180,17 @@ class Facade(_Facade):
 
 class TimedFacade(Facade):
 
+    def init_device(self):
+        if super(TimedFacade, self).init_device():
+            self.UpdateTime()
+            return True
+
     Time = local_attribute(dtype=float)
 
     @command(
         polling_period=1000,
         display_level=DispLevel.EXPERT)
     def UpdateTime(self):
-        self.graph['Time'] = time.time()
+        t = time.time()
+        result = triplet(t, t)
+        self.graph['Time'].set_result(result)
