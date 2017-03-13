@@ -2,78 +2,177 @@
 
 # Imports
 import time
-from tango import AttrWriteType, CmdArgType
-from tango.server import device_property, command
+from functools import partial
+
+from tango import AttributeProxy
+from tango import AttrWriteType, CmdArgType, DevState
+from tango.server import device_property, command, attribute
+
+from facadedevice.base import Node, triplet
 from facadedevice.common import aggregate_qualities, NONE_STRING
 
 
-# Constants
-PREFIX = ''
-SUFFIX = '_data'
+# Aggregation
 
-
-# Attribute data name
-def attr_data_name(key):
-    return PREFIX + key.lower() + SUFFIX
+def aggregate(logger, func, *nodes):
+    results = [node.result() for node in nodes]
+    values, stamps, qualities = zip(*results)
+    try:
+        result = func(*values)
+    except Exception as exc:
+        logger(exc)
+        raise exc
+    if isinstance(result, triplet):
+        return result
+    stamp = max(stamps)
+    quality = aggregate_qualities(qualities)
+    return triplet(result, stamp, quality)
 
 
 # Base class object
+
 class class_object(object):
     """Provide a base for objects to be processed by ProxyMeta."""
 
+    # Methods to override
+
     def update_class(self, key, dct):
-        """Method to override."""
         self.key = key
 
+    def configure(self, device):
+        pass
 
-# Local attribute object
+    def connect(self, device):
+        pass
+
+
+# State attribute
+
+
+class state_attribute(class_object):
+    """Tango state attribute with event support."""
+
+    def __init__(self, bind=None):
+        self.bind = bind
+        self.method = None
+
+    def __call__(self, method):
+        """Decorator support"""
+        self.method = method
+        return self
+
+    # Device methods
+
+    def set_state(self, device, node):
+        try:
+            if node.exception() is not None:
+                device.set_state(DevState.FAULT)
+                device.set_status("Error: {!r}".format(node.exception()))
+            else:
+                value, stamp, quality = node.result()
+                try:
+                    state, status = value
+                except ValueError:
+                    state, status = value, "The state is {}".format(value)
+                device.set_state(state, stamp, quality)
+                device.set_status(status, stamp, quality)
+        except Exception as exc:
+            device.ignore_exception(exc)
+
+    # Configuration methods
+
+    def update_class(self, key, dct):
+        """Create the attribute and read method."""
+        super(state_attribute, self).update_class(key, dct)
+        dct['_class_dict'][key] = self
+
+    def configure(self, device):
+        node = Node(self.key)
+        node.callbacks.append(partial(self.set_state, device))
+        device.graph.add_node(node)
+        if self.method and self.bind:
+            msg = "Error while updating {!r}".format(node)
+            logger = partial(device.ignore_exception, msg=msg)
+            func = partial(aggregate, logger, self.method.__get__(device))
+            device.graph.add_rule(node, func, self.bind)
+
+
+# Local attribute
+
 class local_attribute(class_object):
     """Tango attribute with event support.
-    It will also be available through the data dictionary.
+
     Local attributes support the standard attribute keywords.
 
     Args:
-        callback (str or function): method to call when the attribute
-            changes. It is called with value, stamp and quality.
-        errback (str or function): method to call when the callback
-            fails. It is called with error, message and origin.
+        callback (str or function): method to call when the attribute changes.
+             It is called with the corresponding node as an argument
     """
 
-    def __init__(self, callback=None, errback='ignore_exception', **kwargs):
-        """Init with tango attribute keywords.
-
-        Args:
-            callback (str or function): method to call when the attribute
-                changes. It is called with value, stamp and quality.
-            errback (str or function): method to call when the callback
-                fails. It is called with error, message and origin.
-        """
+    def __init__(self, callback=None, **kwargs):
         self.kwargs = kwargs
         self.dtype = self.kwargs['dtype']
-        self.callback = callback
-        self.errback = errback
-        self.method = None
-        self.attr = None
-        self.prop = None
-        self.device = None
+        self.callback = None
 
     def notify(self, callback):
         """To use as a decorator to register a callback."""
         self.callback = callback
         return callback
 
+    def run_callback(self, device, node):
+        try:
+            device.push_event_for_node(node)
+        except Exception as exc:
+            msg = "Error while pushing event for {!r}"
+            device.ignore_exception(exc, msg.format(node))
+        try:
+            if self.callback:
+                self.callback.__get__(device)(node)
+        except Exception as exc:
+            msg = "Error while running user callback for {!r}"
+            device.ignore_exception(exc, msg.format(node))
+
+    # Properties
+
+    @property
+    def writable(self):
+        return self.kwargs.get('access') == AttrWriteType.READ_WRITE or \
+               self.custom_writable
+
+    @property
+    def custom_writable(self):
+        return set(self.kwargs) & set(['fwrite', 'fset'])
+
+    # Configuration methods
+
     def update_class(self, key, dct):
         """Create the attribute and read method."""
         super(local_attribute, self).update_class(key, dct)
-        # # Property
-        # prop = event_property(key, dtype=self.dtype,
-        #                       is_allowed=self.kwargs.get("fisallowed"),
-        #                       callback=self.callback, errback=self.errback)
-        # dct[attr_data_name(key)] = prop
-        # # Attribute
-        # dct[key] = attribute(fget=prop.read, **self.kwargs)
-        # dct["_class_dict"]["attributes"][key] = self
 
+        kwargs = dict(self.kwargs)
+
+        def read(device, attr=None):
+            value, stamp, quality = device.graph[key].result()
+            if attr:
+                attr.set_value_date_quality(value, stamp, quality)
+            return value, stamp, quality
+        kwargs['fget'] = read
+
+        if self.writable and not self.custom_writable:
+            def write(device, value):
+                device.graph[key].set_result()
+            kwargs['fset'] = write
+
+        dct[key] = attribute(**kwargs)
+        dct['_class_dict'][key] = self
+
+    def configure(self, device):
+        node = Node(self.key)
+        node.callbacks.append(partial(self.run_callback, device))
+        device.graph.add_node(node)
+
+
+# Logical attribute
 
 class logical_attribute(local_attribute):
     """Tango attribute computed from the values of other attributes.
@@ -83,102 +182,30 @@ class logical_attribute(local_attribute):
     Logical attributes also support the standard attribute keywords.
     """
 
-    def __init__(self, *args, **kwargs):
-        self.bind = kwargs.pop('bind', ())
-        local_attribute.__init__(self, *args, **kwargs)
-        if self.method:
-            self.set_method(method, self.bind)
-
-    def set_method(self, method, bind=()):
-        """Decorator support."""
+    def __init__(self, bind, **kwargs):
         self.bind = bind
-        self.raw_method = method
-        self.method = lambda *args: self._update(*args)
-        return self
+        self.method = None
+        local_attribute.__init__(self, **kwargs)
 
     def __call__(self, method):
         """Decorator support."""
-        self.set_method(method, self.bind)
-        return self
-
-    def _update(self, device, data):
-        method = self.raw_method.__get__(device)
-        if not self.bind:
-            result = method(data)
-        else:
-            args = (data[attr] for attr in self.bind)
-            result = method(*args)
-        value, stamp, quality = event_property.unpack(result)
-        if stamp is None:
-            stamp = self.get_stamp(device)
-        if quality is None:
-            quality = self.get_quality(device)
-        return stamped(value, stamp, quality)
-
-    def get_stamp(self, device):
-        bind = self.bind
-        if not bind:
-            bind = [
-                attr
-                for attr, value in device._class_dict["attributes"].items()
-                if isinstance(value, proxy_attribute)]
-        if not bind:
-            return
-        names = map(attr_data_name, bind)
-        props = (getattr(type(device), name) for name in names)
-        stamps = (prop.get_value(device).stamp for prop in props)
-        return max(stamps)
-
-    def get_quality(self, device):
-        if not self.bind:
-            return
-        names = map(attr_data_name, self.bind)
-        props = (getattr(type(device), name) for name in names)
-        qualities = (prop.get_value(device).quality for prop in props)
-        return aggregate_qualities(qualities)
+        self.method = method
 
 
-# Proxy attribute object
+# Proxy attribute
+
 class proxy_attribute(local_attribute):
     """Tango attribute linked to the attribute of a remote device.
 
     Args:
-        device (str):
-            Name of the property that contains the device name.
         prop (str):
             Name of the property containing the attribute name.
-            None to not use a property (None by default).
-        attr (str):
-            Name of the attribute to forward. If `prop` is specified,
-            `attr` is the default property value (None by default).
 
-    A ValueError is raised if neither of `prop` or `attr` is specified.
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, device, attr=None, prop=None, **kwargs):
-        """Initialize the proxy attribute.
-
-        Args:
-            device (str):
-                Name of the property that contains the device name.
-            prop (str):
-                Name of the property containing the attribute name.
-                None to not use a property (None by default).
-            attr (str):
-                Name of the attribute to forward. If `prop` is specified,
-                `attr` is the default property value (None by default).
-
-        A ValueError is raised if neither of `prop` or `attr` is specified.
-        Also supports the standard attribute keywords.
-        """
-        local_attribute.__init__(self, **kwargs)
-        if not (attr or prop):
-            raise ValueError(
-                "Either attr or prop argument has to be specified "
-                "to initialize a {0}".format(type(self).__name__))
-        self.device = device
-        self.attr = attr
+    def __init__(self, prop, **kwargs):
+        super(proxy_attribute, self).__init__(**kwargs)
         self.prop = prop
 
     def update_class(self, key, dct):
@@ -187,126 +214,47 @@ class proxy_attribute(local_attribute):
         Also register useful informations in the property dictionary.
         """
         # Parent method
-        local_attribute.update_class(self, key, dct)
-        # # Create device property
-        # dct[self.device] = device_property(dtype=str, doc="Proxy device.")
-        # doc = "Attribute of '{0}' forwarded as {1}.".format(self.device, key)
-        # if self.prop:
-        #     dct[self.prop] = device_property(dtype=str, doc=doc,
-        #                                      default_value=self.attr)
-        # # Read-only
-        # if not self.writable:
-        #     return
-        # # Custom write
-        # if dct.get("is_" + key + "_allowed") or \
-        #    set(self.kwargs) & set(["fwrite", "fset"]):
-        #     return
+        super(proxy_attribute, self).update_class(key, dct)
 
-        # # Write method
-        # def write(device, value):
-        #     proxy_name = device._device_dict[key]
-        #     device_proxy = device._proxy_dict[proxy_name]
-        #     proxy_attr = device._attribute_dict[key]
-        #     device_proxy.write_attribute(proxy_attr, value)
-        # dct[key] = dct[key].setter(write)
+        # Create device property
+        doc = "Attribute to be forwarded as {}.".format(key)
+        dct[self.prop] = device_property(dtype=str, doc=doc)
 
-    @property
-    def writable(self):
-        return self.kwargs.get("access") == AttrWriteType.READ_WRITE or \
-            set(self.kwargs) & set(["fwrite", "fset"])
+        # Read-only
+        if not self.writable or self.custom_writable:
+            return
+
+        # Write method
+
+        def write(device, value):
+            attr = getattr(device, self.prop)
+            proxy = AttributeProxy(attr)
+            proxy.write(value)
+
+        # Set write method
+        dct[key] = dct[key].setter(write)
 
     # Device methods
 
-    def init_connection(self, device):
+    def configure(self, device):
+        # Parent call
+        super(proxy_attribute, self).configure(device)
+        # Get node
+        node = device.graph[self.key]
         # Get properties
-        device_name = getattr(device, self.device)
-        if self.prop:
-            attr_name = getattr(device, self.prop)
+        attr = getattr(device, self.prop).strip().lower()
+        # Ignore attribute
+        if attr == NONE_STRING:
+            node.remote_attr = None
+        # Add attribute
         else:
-            attr_name = self.attr
-        # Ignore attribure
-        if attr_name.strip().lower() == NONE_STRING:
-            return
+            node.remote_attr = attr
+
+    def connect(self, device):
+        # Get node
+        node = device.graph[self.key]
         # Subscribe
-        etype = device.subscribe(device_name, attr_name, self.key)
-
-
-# Block attribute object
-class block_attribute(proxy_attribute):
-    """Tango attribute to gather several attributes of a remote device
-    using a common prefix.
-
-    Args:
-        device (str):
-            Name of the property that contains the device name.
-        prop (str):
-            Name of the property containing the attribute prefix.
-            None to not use a property (None by default).
-        attr (str):
-            Prefix of the attributes to forward. If `prop` is specified,
-            `attr` is the default property value (None by default).
-
-    A ValueError is raised if neither of `prop` or `attr` is specified.
-    Also supports the standard attribute keywords.
-    """
-
-    def __init__(self, device, attr=None, prop=None, **kwargs):
-        """Initialize the block attribute.
-
-        Args:
-            device (str):
-                Name of the property that contains the device name.
-            prop (str):
-                Name of the property containing the attribute prefix.
-                None to not use a property (None by default).
-            attr (str):
-                Prefix of the attributes to forward. If `prop` is specified,
-                `attr` is the default property value (None by default).
-
-        A ValueError is raised if neither of `prop` or `attr` is specified.
-        Also supports the standard attribute keywords.
-        """
-        kwargs.setdefault('dtype', self.dtype)
-        kwargs.setdefault('max_dim_x', 5)
-        kwargs.setdefault('max_dim_y', 1000)
-        proxy_attribute.__init__(self, device, attr, prop, **kwargs)
-        if self.writable:
-            raise ValueError("A block attribute has to be read-only")
-
-    def update_class(self, key, dct):
-        """Create the attribute and read method."""
-        proxy_attribute.update_class(self, key, dct)
-        # self.method = self.make_method(key)
-
-    def __call__(self, *args, **kwargs):
-        raise TypeError("A block attribute cannot be used as a decorator")
-
-    @classmethod
-    def make_method(cls, key):
-        def update(self, data):
-            device = self._device_dict[key]
-            attrs = self._block_dict[device][key]
-            return [(cls.format_name(attr),) + cls.format_value(data[attr])
-                    for attr in attrs]
-        return update
-
-    @staticmethod
-    def format_name(name):
-        return name.split('.')[-1].replace('__', '.')
-
-    @staticmethod
-    def format_value(value):
-        return (str(value.value), str(value.quality),
-                str(value.type), str(value.time))
-
-    @property
-    def dtype(self):
-        return ((str,),)
-
-    @dtype.setter
-    def dtype(self, value):
-        if value != self.dtype:
-            raise ValueError("A block attribute has to be an image of string")
+        device.subscribe(node.remote_attr, node)
 
 
 # Proxy command object
