@@ -76,15 +76,17 @@ class CameraScreen(Facade):
 
     # Proxy commands
 
-    MoveIn = proxy_command(
+    @proxy_command(
         prop="MoveInAttr",
-        attr=True,
-        value=1)
+        attr=True)
+	def MoveIn(self, subcommand):
+		subcommand(1)
 
-    MoveOut = proxy_command(
+    @proxy_command(
         prop="MoveOutAttr",
-        attr=True,
-        value=1)
+        attr=True)
+	def MoveOut(self, subcommand):
+	    subcommand(1)
 
     # State and status
 
