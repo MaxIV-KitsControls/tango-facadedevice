@@ -236,7 +236,7 @@ def test_diamond_graph():
     graph.add_rule(graph['c'], lambda a: a.result() * 100, ['a'])
     graph.add_rule(graph['d'], lambda c: c.result() // 100, ['c'])
     graph.add_rule(graph['e'], add, ['b', 'd'])
-    graph.add_rule(graph['f'], lambda a: 1 / a.result(), ['a'])
+    graph.add_rule(graph['f'], lambda a: 1. / a.result(), ['a'])
     graph.add_rule(graph['g'], recover, ['f'])
 
     # Build graph
@@ -245,7 +245,6 @@ def test_diamond_graph():
     # Test 1
     graph['a'].set_result(0)
     for x in 'abcde':
-        print(x)
         assert graph[x].result() == 0
     with pytest.raises(ZeroDivisionError):
         assert graph['f'].result()
