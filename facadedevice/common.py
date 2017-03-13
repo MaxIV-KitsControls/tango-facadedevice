@@ -217,7 +217,7 @@ class EnhancedDevice(Device):
             return
         # Set default state
         if self.get_state() == DevState.INIT:
-            self.set_state(DevState.ON)
+            self.set_state(DevState.UNKNOWN)
 
     def init_device(self):
         pass
