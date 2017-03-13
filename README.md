@@ -2,13 +2,13 @@ python-facadedevice
 ===================
 ***
 
-Provide a facade device to subclass.
+Provide a facade devices to subclass.
 
 Information
 -----------
 
  - Package: python-facadedevice
- - Device:  Facade (+ FacadeMeta)
+ - Device:  Facade (+ TimedFacade)
  - Repo:    [lib-maxiv-facadedevice][repo]
 
 [repo]: https://github.com/MaxIV-KitsControls/lib-maxiv-facadedevice.git
@@ -17,30 +17,37 @@ Information
 Usage
 -----
 
-In order to subclass the `Facade` device, it is required to define `FacadeMeta`
-as metaclass. The proxy device supports the following objects:
+The facade devices support the following objects:
 
 - **proxy_attribute**: TANGO attribute linked to the attribute of a remote
-  device. Attribute and device are given as property names. It supports the
-  standard attribute keywords.
+  device. Full attribute name is given as property. It supports the
+  standard attribute keywords. Optionally, a conversion method can be given.
 
 - **logical_attribute**: TANGO attribute computed from the values of other
   attributes. Use it as a decorator to register the function that make this
-  computation. The decorated method takes the attribute value dictionnary as
-  argument. Logical attributes also support the standard attribute keywords.
+  computation.
+
+- **state_attribute**: It is used to describe the logical relationship between
+  state/status and the other attributes. It is very similar to logical attributes.
+
+- **combined_attribute**: TANGO attribute computed from the values of other
+  remote attributes. Use it as a decorator to register the function that make this
+  computation. The remote attribute names are provided by a property, either as a
+  list or a pattern.
+
+- **local_attribute**: TANGO attribute holding a local value. Useful for configuring
+  the device at runtime.
 
 - **proxy_command**: TANGO command to write an attribute of a remote device
-  with a given value. Attribute and device are given as property names. It
+  with a given value. The full attribute name is given as a property. It
   supports standard command keywords.
-
-In order to define the state and status of the device, these two methods can be
-overriden:
-
-- **state_from _data**: return the state to set, or None
-- **status_from _data**: return the status to set, or None
 
 Moreover, the `Facade` device is fully subclassable in a standard pythonic way
 (super, calls to parent methods, etc).
+
+The `TimedFacade` class already implement a `Time` attribute that can be used to
+run periodic update (by binding to a logical attribute).
+
 
 Example
 -------
@@ -48,77 +55,59 @@ Example
 ```python
 # Example
 class CameraScreen(Facade):
-    __metaclass__ = FacadeMeta
 
     # Proxy attributes
+
     StatusIn = proxy_attribute(
-        device="OPCDevice",
-        prop="InStatusTag",
-        dtype=bool)
+	    dtype=bool,
+        prop="StatusInAttribute")
 
     StatusOut = proxy_attribute(
-        device="OPCDevice",
-        prop="OutStatusTag",
-        dtype=bool)
+        dtype=bool,
+        prop="StatusOutAttribute")
 
     # Logical attributes
-    @logical_attribute(dtype=bool)
-    def Error(self, data):
-        return data["StatusIn"] == data["StatusOut"]
+
+    @logical_attribute(
+		dtype=bool,
+		bind=['StatusIn', 'StatusOut'])
+    def Error(self, status_in, status_out):
+        return status_in == status_out
 
     # Proxy commands
+
     MoveIn = proxy_command(
-        device="OPCDevice",
-        prop="InCmdTag",
+        prop="MoveInAttr",
         attr=True,
         value=1)
 
     MoveOut = proxy_command(
-        device="OPCDevice",
-        prop="OutCmdTag",
+        prop="MoveOutAttr",
         attr=True,
         value=1)
 
-    # State
-    def state_from_data(self, data):
-        if data['Error']:
-            return DevState.FAULT
-        return DevState.INSERT if data['StatusIn'] else DevState.EXTRACT
+    # State and status
 
-    # Status
-    def status_from_data(self, data):
-        if data['Error']:
-            return "Conflict between IN and OUT informations"
-        return "IN" if data['StatusIn'] else "OUT"
+	@state_attribute
+    def state(self, error, status_in):
+        if error:
+            return DevState.FAULT, "Conflict between IN and OUT"
+		if status_in:
+            return DevState.INSERT, "IN"
+        return DevState.EXTRACT, "OUT"
+
 ```
 
 Unit testing
 ------------
 
-The package is unittested using `devicetest` and the example class given above.
-
-Statement coverage is currently greater than 84%.
+Statement coverage is currently greater than ??%.
 
 
 Documentation
 -------------
 
-This project has no documentation yet, but I'm pasting below some explainantions that should be refactored properly at some point:
-
-A Facade device has its own way of dealing with communication errors: any communication error with the proxies will cause the device to go to fault state, set all the forwarded/logical attributes with an INVALID quality (not the local attributes though), and prevent the execution of forwarded commands. The status should also be pretty explicit. Then the device is frozen and it won't update its state, status or attributes any more.
-
-Now, about recovering. The Facade device do not recover from communication error, unless they come from a change event. That means that if you want your device to reconnect automatically, you need the following configuration:
-
-- in the sub-devices, configure all the attributes to forward to push events (enable polling and set a threshold if necessary)
-- make sure everything is accessible when your first start the device (the device do not reconnect if it has never started)
-- check the report of the GetInfo command to make sure the facade device used subscription and not polling for all the attributes it forwards.
-
-It turns out there is a way to configure the device to ensure this recovering behavior: you need to set those properties:
-
-- PushEvent: True
-- UpdatePeriod: 0
-
-With this configuration, the device will go to FAULT if it is not able to subscribe to all the attributes. That also means there won't be any internal polling and the device will be fully "reactive".
+This project has no actual documentation yet.
 
 
 Contact
