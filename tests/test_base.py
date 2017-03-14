@@ -38,7 +38,7 @@ def test_node_setters():
     n = Node('test', description='desc', callbacks=mocks)
     assert n.name == 'test'
     assert n.description == 'desc'
-    assert repr(n) == "Node('test')"
+    assert repr(n) == "node <test>"
     assert n.exception() is None
     assert n.result() is None
     for m in mocks:
