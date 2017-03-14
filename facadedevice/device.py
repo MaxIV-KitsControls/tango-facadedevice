@@ -4,7 +4,7 @@
 import time
 
 # Base imports
-from facadedevice.base import triplet, Graph
+from facadedevice.base import triplet, Graph, context
 
 # Common imports
 from facadedevice.common import EnhancedDevice, debug_it
@@ -14,7 +14,8 @@ from facadedevice.objects import class_object, local_attribute
 
 # Tango imports
 from tango.server import command
-from tango import DevFailed, EventData, EventType, DispLevel
+from tango import AttributeProxy
+from tango import DevFailed, DevState, EventData, EventType, DispLevel
 
 
 # Proxy metaclass
@@ -39,6 +40,7 @@ class FacadeMeta(type(EnhancedDevice)):
         # Process class objects
         for key, value in list(dct.items()):
             if isinstance(value, class_object):
+                class_dict[key] = value
                 value.update_class(key, dct)
         # Create device class
         return type(EnhancedDevice).__new__(metacls, name, bases, dct)
@@ -57,26 +59,33 @@ class Facade(_Facade):
     # Reasons to ignore for errors in events
     reasons_to_ignore = ["API_PollThreadOutOfSync"]
 
-    # Helpers
+    # Properties
 
     @property
     def graph(self):
         return self._graph
 
+    # Helpers
+
+    def write_attribute_from_property(self, prop, value):
+        attr = getattr(self, prop)
+        proxy = AttributeProxy(attr)
+        proxy.write(value)
+
     # Events handling
 
-    def subscribe(self, attr, node):
+    def subscribe_for_node(self, attr, node):
         try:
             self.subscribe_event(
                 attr,
                 EventType.CHANGE_EVENT,
-                lambda event: self.on_event(node, event))
+                lambda event: self.on_node_event(node, event))
         except DevFailed:
             try:
                 self.subscribe_event(
                     attr,
                     EventType.PERIODIC_EVENT,
-                    lambda event: self.on_event(node, event))
+                    lambda event: self.on_node_event(node, event))
             except DevFailed:
                 msg = "Can't subscribe to event for attribute {}"
                 self.info_stream(msg.format(attr))
@@ -91,7 +100,7 @@ class Facade(_Facade):
             return EventType.CHANGE_EVENT
 
     @debug_it
-    def on_event(self, node, event):
+    def on_node_event(self, node, event):
         """Handle attribute events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
@@ -117,6 +126,23 @@ class Facade(_Facade):
         value = triplet.from_attr_value(event.attr_value)
         node.set_result(value)
 
+    # Push events
+
+    def set_state_from_node(self, node):
+        if node.exception() is not None:
+            self.register_exception(node.exception())
+        elif node.result() is None:
+            self.set_state(DevState.UNKNOWN)
+            self.set_status("The state is currently not available.")
+        else:
+            value, stamp, quality = node.result()
+            try:
+                state, status = value
+            except ValueError:
+                state, status = value, "The state is {}".format(value)
+            self.set_state(state, stamp, quality)
+            self.set_status(status, stamp, quality)
+
     def push_event_for_node(self, node):
         attr = getattr(self, node.name)
         # Set events
@@ -128,10 +154,26 @@ class Facade(_Facade):
         if node.exception() is not None:
             self.push_change_event(node.name, node.exception())
             self.push_archive_event(node.name, node.exception())
+        elif node.result is None:
+            pass
         else:
             value, stamp, quality = node.result()
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
+
+    # Read / write nodes
+
+    def read_from_node(self, node, attr=None):
+        if node.result() is None:
+            return
+        value, stamp, quality = node.result()
+        if attr:
+            attr.set_value_date_quality(value, stamp, quality)
+        return value, stamp, quality
+
+    def write_to_node(self, node, value):
+        result = triplet(value, time.time())
+        node.set_result(result)
 
     # Initialization and cleanup
 
@@ -139,31 +181,16 @@ class Facade(_Facade):
         """Initialize the device."""
         self._graph = Graph()
         # Configure
-        try:
-            for value in self._class_dict.values():
+        for value in self._class_dict.values():
+            with context('configuring', value):
                 value.configure(self)
-        except Exception as exc:
-            msg = "Error while configuring the device"
-            self.register_exception(exc, msg)
-            return
         # Build graph
-        try:
+        with context('building', self._graph):
             self._graph.build()
-        except Exception as exc:
-            msg = "Error while building the graph"
-            self.register_exception(exc, msg)
-            return
         # Connect
-        try:
-            for value in self._class_dict.values():
+        for value in self._class_dict.values():
+            with context('connecting', value):
                 value.connect(self)
-        except Exception as exc:
-            self._graph.reset()
-            msg = "Error while connecting the device"
-            self.register_exception(exc, msg)
-            return
-        # Success !
-        return True
 
     def delete_device(self):
         # Reset graph
@@ -181,9 +208,8 @@ class Facade(_Facade):
 class TimedFacade(Facade):
 
     def init_device(self):
-        if super(TimedFacade, self).init_device():
-            self.UpdateTime()
-            return True
+        super(TimedFacade, self).init_device()
+        self.UpdateTime()
 
     Time = local_attribute(dtype=float)
 

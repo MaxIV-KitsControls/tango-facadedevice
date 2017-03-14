@@ -1,10 +1,14 @@
 
+import textwrap
 import warnings
+import traceback
+
 from numpy import array_equal
 from tango import AttrQuality
 
 from functools import partial
 from collections import Mapping, namedtuple, defaultdict
+from contextlib import contextmanager
 
 # Constants
 
@@ -47,9 +51,39 @@ triplet.__init__ = lambda self, *args: assert_triplet(self)
 triplet.from_attr_value = classmethod(from_attr_value)
 
 
+# Exception context
+
+class ContextException(Exception):
+
+    def __init__(self, base, context, origin, tb=None):
+        self.base = base
+        self.context = context
+        self.origin = origin
+        self.traceback = tb
+
+    @property
+    def desc(self):
+        return repr(self)
+
+    def __repr__(self):
+        base = repr(self.base).splitlines()
+        indented = '\n'.join('  ' + line for line in base)
+        return "Exception while {} {}:\n{}".format(
+            self.context, self.origin, indented)
+
+
+@contextmanager
+def context(msg, origin):
+    try:
+        yield
+    except Exception as exc:
+        raise ContextException(
+            exc, msg, origin, traceback.format_exc())
+
+
 # Node object
 
-class Node:
+class Node(object):
 
     def __init__(self, name, description=None, callbacks=()):
         self._result = None
@@ -103,7 +137,17 @@ class Node:
     # Representation
 
     def __repr__(self):
-        return "Node({!r})".format(self.name)
+        return "node <{}>".format(self.name)
+
+
+# Restricted node
+
+class RestrictedNode(Node):
+
+    def set_result(self, result):
+        if result is not None and not isinstance(result, triplet):
+            raise TypeError("Not a triplet (or None)")
+        return super(RestrictedNode, self).set_result(result)
 
 
 # Graph object
@@ -219,11 +263,9 @@ class Graph(Mapping):
     def update(self, node):
         callback = self._updates[node]
         try:
-            result = callback()
+            node.set_result(callback())
         except Exception as exc:
             node.set_exception(exc)
-        else:
-            node.set_result(result)
 
     # Dict interface
 

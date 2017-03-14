@@ -157,8 +157,7 @@ class EnhancedDevice(Device):
         except AttributeError:
             exc = str(exc) if str(exc) else repr(exc)
         # Format status
-        form = lambda x: x.capitalize() if x else x
-        status = '\n'.join(filter(None, [form(msg), form(exc)]))
+        status = '\n'.join(filter(None, [msg, exc]))
         # Stream error
         self.error_stream(status)
         # Save in history
@@ -208,13 +207,15 @@ class EnhancedDevice(Device):
             msg = "Error while getting device properties"
             self.register_exception(exc, msg)
             return
-        # Use init_device result as connection flag
+        # Initialize the device
         try:
-            self._connected = bool(self.init_device())
+            self.init_device()
         except Exception as exc:
-            msg = 'Unexpected error in init_device method'
+            msg = "Exception while initializing the device"
             self.register_exception(exc, msg)
             return
+        else:
+            self._connected = True
         # Set default state
         if self.get_state() == DevState.INIT:
             self.set_state(DevState.UNKNOWN)
