@@ -29,19 +29,6 @@ except Exception:
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 
 
-# TID helper
-
-def gettid():
-    libc = 'libc.so.6'
-    for cmd in (186, 224, 178):
-        try:
-            tid = ctypes.CDLL(libc).syscall(cmd)
-        except OSError:
-            return threading.current_thread().ident
-        if tid != -1:
-            return tid
-
-
 # Safer traceback
 
 def safe_traceback(limit=None):
@@ -56,32 +43,6 @@ def aggregate_qualities(qualities):
     t2 = lambda x: (int(x) + 1) % length
     result = t2(min(map(t1, qualities)))
     return AttrQuality.values[result]
-
-
-# Debug it decorator
-
-def debug_it(func):
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        # Enter method
-        tid = gettid()
-        method = func.__name__
-        msg = "Entering method {0} (tid={1})"
-        self.debug_stream(msg.format(method, tid))
-        # Run method
-        try:
-            result = func(self, *args, **kwargs)
-        # Exit method with exception
-        except Exception as exception:
-            msg = "Method {0} failed (exception={1!r}, tid={2})"
-            self.debug_stream(msg.format(method, exception, tid))
-            raise
-        # Exit method with result
-        else:
-            msg = "Method {0} returned (result={1!r}, tid={2})"
-            self.debug_stream(msg.format(method, result, tid))
-            return result
-    return wrapper
 
 
 # Patched device proxy
