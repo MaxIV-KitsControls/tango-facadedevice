@@ -106,7 +106,6 @@ class local_attribute(node_object):
     # Configuration methods
 
     def update_class(self, key, dct):
-        """Create the attribute and read method."""
         super(local_attribute, self).update_class(key, dct)
         kwargs = dict(self.kwargs)
         # Read method
@@ -267,7 +266,7 @@ class combined_attribute(proxy_attribute):
 class state_attribute(node_object):
     """Tango state attribute with event support."""
 
-    def __init__(self, bind):
+    def __init__(self, bind=None):
         self.bind = bind
         self.method = None
 
@@ -275,7 +274,15 @@ class state_attribute(node_object):
         self.method = method
         return self
 
+    def update_class(self, key, dct):
+        super(state_attribute, self).update_class(key, dct)
+        # Restore method
+        if self.method:
+            self.method.bind = self.bind
+            dct[key] = self.method
+
     def configure(self, device):
+        # Parent call
         super(state_attribute, self).configure(device)
         node = device.graph[self.key]
         # Add set state callback
@@ -283,6 +290,9 @@ class state_attribute(node_object):
             device.safe_callback,
             "setting the state from",
             device.set_state_from_node))
+        # Nothing to bind
+        if not self.bind and not self.method:
+            return
         # Bind node
         self.bind_node(device, node, self.bind, self.method)
 
