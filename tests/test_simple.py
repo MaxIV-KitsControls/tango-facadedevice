@@ -9,7 +9,7 @@ from tango import DevState
 from tango.test_context import DeviceTestContext
 
 # Proxy imports
-from facadedevice.base import VALID
+from facadedevice.graph import VALID
 from facadedevice import Facade, TimedFacade, state_attribute
 
 

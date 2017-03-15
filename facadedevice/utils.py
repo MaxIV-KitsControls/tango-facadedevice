@@ -1,4 +1,4 @@
-"""Provide generic decorators."""
+"""Provide helpers for tango."""
 
 # Imports
 import time
@@ -27,7 +27,6 @@ except Exception:
 # Constants
 
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
-NONE_STRING = "none"
 
 
 # TID helper

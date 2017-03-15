@@ -4,10 +4,10 @@
 import time
 
 # Base imports
-from facadedevice.base import triplet, Graph, context
+from facadedevice.graph import triplet, Graph, context
 
 # Common imports
-from facadedevice.common import EnhancedDevice, aggregate_qualities
+from facadedevice.utils import EnhancedDevice, aggregate_qualities
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute

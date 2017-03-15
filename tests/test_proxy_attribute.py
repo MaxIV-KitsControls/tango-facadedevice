@@ -8,7 +8,7 @@ from tango import DevState, EventType, EventData, AttrQuality
 from tango import AttrWriteType
 
 # Proxy imports
-from facadedevice import Facade, proxy_attribute, common, device
+from facadedevice import Facade, proxy_attribute, utils, device
 
 # Local imports
 from test_simple import event_mock
@@ -24,8 +24,8 @@ def test_proxy_attribute(mocker):
 
     change_events, archive_events = event_mock(Test)
 
-    mocker.patch('facadedevice.common.create_device_proxy')
-    inner_proxy = common.create_device_proxy.return_value
+    mocker.patch('facadedevice.utils.create_device_proxy')
+    inner_proxy = utils.create_device_proxy.return_value
     inner_proxy.dev_name.return_value = 'a/b/c'
     subscribe_event = inner_proxy.subscribe_event
 
@@ -33,7 +33,7 @@ def test_proxy_attribute(mocker):
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
-        common.create_device_proxy.assert_called_with('a/b/c')
+        utils.create_device_proxy.assert_called_with('a/b/c')
         subscribe_event.assert_called()
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False
@@ -69,8 +69,8 @@ def test_proxy_attribute_with_convertion(mocker):
 
     change_events, archive_events = event_mock(Test)
 
-    mocker.patch('facadedevice.common.create_device_proxy')
-    inner_proxy = common.create_device_proxy.return_value
+    mocker.patch('facadedevice.utils.create_device_proxy')
+    inner_proxy = utils.create_device_proxy.return_value
     inner_proxy.dev_name.return_value = 'a/b/c'
     subscribe_event = inner_proxy.subscribe_event
 
@@ -78,7 +78,7 @@ def test_proxy_attribute_with_convertion(mocker):
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
-        common.create_device_proxy.assert_called_with('a/b/c')
+        utils.create_device_proxy.assert_called_with('a/b/c')
         subscribe_event.assert_called()
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False
@@ -113,8 +113,8 @@ def test_writable_proxy_attribute(mocker):
 
     change_events, archive_events = event_mock(Test)
 
-    mocker.patch('facadedevice.common.create_device_proxy')
-    inner_proxy = common.create_device_proxy.return_value
+    mocker.patch('facadedevice.utils.create_device_proxy')
+    inner_proxy = utils.create_device_proxy.return_value
     inner_proxy.dev_name.return_value = 'a/b/c'
     subscribe_event = inner_proxy.subscribe_event
 
@@ -125,7 +125,7 @@ def test_writable_proxy_attribute(mocker):
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
-        common.create_device_proxy.assert_called_with('a/b/c')
+        utils.create_device_proxy.assert_called_with('a/b/c')
         subscribe_event.assert_called()
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False

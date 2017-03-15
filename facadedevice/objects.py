@@ -3,11 +3,16 @@
 # Imports
 from functools import partial
 
+# Tango imports
 from tango import AttrWriteType
 from tango.server import device_property, command, attribute
 
-from facadedevice.base import RestrictedNode
-from facadedevice.common import NONE_STRING
+# Local imports
+from facadedevice.graph import RestrictedNode
+
+# Constants
+
+NONE_STRING = "none"
 
 
 # Base class object

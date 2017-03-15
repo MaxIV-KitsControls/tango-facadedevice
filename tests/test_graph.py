@@ -3,8 +3,8 @@ import mock
 import numpy
 import pytest
 
-from facadedevice.base import Node, triplet, Graph
-from facadedevice.base import VALID, INVALID
+from facadedevice.graph import Node, triplet, Graph
+from facadedevice.graph import VALID, INVALID
 
 
 def test_compare_triplet():
