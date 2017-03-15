@@ -7,7 +7,7 @@ import time
 from facadedevice.base import triplet, Graph, context
 
 # Common imports
-from facadedevice.common import EnhancedDevice, debug_it
+from facadedevice.common import EnhancedDevice, debug_it, aggregate_qualities
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute
@@ -174,6 +174,36 @@ class Facade(_Facade):
     def write_to_node(self, node, value):
         result = triplet(value, time.time())
         node.set_result(result)
+
+    # Safe callbacks
+
+    def run_callback(self, ctx, func, node):
+        try:
+            with context(ctx, node):
+                func(node)
+        except Exception as exc:
+            self.ignore_exception(exc)
+
+    def aggregate_for_node(self, node, func, *nodes):
+        with context("updating", node):
+            # Forward first exception
+            for node in nodes:
+                if node.exception() is not None:
+                    raise node.exception()
+            # Shortcut for empty nodes
+            results = [node.result() for node in nodes]
+            if any(result is None for result in results):
+                return
+            # Exctract values
+            values, stamps, qualities = zip(*results)
+            result = func(*values)
+            # Return triplet
+            if isinstance(result, triplet):
+                return result
+            # Create triplet
+            stamp = max(stamps)
+            quality = aggregate_qualities(qualities)
+            return triplet(result, stamp, quality)
 
     # Initialization and cleanup
 

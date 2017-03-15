@@ -1,34 +1,13 @@
 """Provide class objects for the facade device."""
 
 # Imports
-import time
 from functools import partial
 
-from tango import AttrWriteType, CmdArgType
+from tango import AttrWriteType
 from tango.server import device_property, command, attribute
 
-from facadedevice.base import RestrictedNode, triplet, context
-from facadedevice.common import aggregate_qualities, NONE_STRING
-
-
-# Aggregation
-
-def aggregate(func, *nodes):
-    # Might raise a context exception
-    results = [node.result() for node in nodes]
-    # Shortcut for empty nodes
-    if any(result is None for result in results):
-        return
-    # Exctract values
-    values, stamps, qualities = zip(*results)
-    result = func(*values)
-    # Return triplet
-    if isinstance(result, triplet):
-        return result
-    # Create triplet
-    stamp = max(stamps)
-    quality = aggregate_qualities(qualities)
-    return triplet(result, stamp, quality)
+from facadedevice.base import RestrictedNode
+from facadedevice.common import NONE_STRING
 
 
 # Base class object
@@ -47,6 +26,12 @@ class class_object(object):
     def connect(self, device):
         pass
 
+    # Representation
+
+    def __repr__(self):
+        key = self.key if self.key else "unnamed"
+        return "{} <{}>".format(type(self).__name__, key)
+
 
 # Node object
 
@@ -55,22 +40,21 @@ class node_object(class_object):
     callback = None
 
     def notify(self, callback):
-        """To use as a decorator to register a callback."""
+        """Use as a decorator to register a callback."""
         self.callback = callback
         return callback
 
-    def run_callback(self, device, node):
-        try:
-            if self.callback:
-                self.callback.__get__(device)(node)
-        except Exception as exc:
-            msg = "Error while running user callback for {!r}"
-            device.ignore_exception(exc, msg.format(node))
-
     def configure(self, device):
         node = RestrictedNode(self.key)
-        node.callbacks.append(partial(self.run_callback, device))
         device.graph.add_node(node)
+        # No user callback
+        if not self.callback:
+            return
+        # Add user callback
+        node.callbacks.append(partial(
+            device.run_callback,
+            "running user callback for",
+            self.callback.__get__(device)(node)))
 
 
 # Logical object
@@ -84,25 +68,25 @@ class logical_object(node_object):
         self.bind = bind
 
     def __call__(self, method):
-        """Decorator support"""
         self.method = method
         return self
 
     # Configuration methods
 
-    def aggregate(self, node, func, *nodes):
-        with context('updating', node):
-            return aggregate(func, *nodes)
-
     def configure(self, device):
         super(logical_object, self).configure(device)
         node = device.graph[self.key]
+        # Check values
         if self.bind and not self.method:
             raise ValueError('No update method defined')
         if not self.bind and self.method:
             raise ValueError('Update method not bound')
+        # Add aggregation rule
         if self.bind and self.method:
-            func = partial(self.aggregate, node, self.method.__get__(device))
+            func = partial(
+                device.aggregate_for_node,
+                node,
+                self.method.__get__(device))
             device.graph.add_rule(node, func, self.bind)
 
 
@@ -111,14 +95,14 @@ class logical_object(node_object):
 class state_attribute(logical_object):
     """Tango state attribute with event support."""
 
-    def run_callback(self, device, node):
-        try:
-            device.set_state_from_node(node)
-        except Exception as exc:
-            msg = "Error while setting the state"
-            device.ignore_exception(exc, msg)
-        # Parent call
-        super(state_attribute, self).run_callback(device, node)
+    def configure(self, device):
+        super(state_attribute, self).configure(device)
+        node = device.graph[self.key]
+        # Add set state callback
+        node.callbacks.append(partial(
+            device.run_callback,
+            "setting the state from",
+            device.set_state_from_node))
 
 
 # Local attribute
@@ -135,16 +119,6 @@ class local_attribute(node_object):
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
-
-    def run_callback(self, device, node):
-        # Push events
-        try:
-            device.push_event_for_node(node)
-        except Exception as exc:
-            msg = "Error while pushing event for {!r}"
-            device.ignore_exception(exc, msg.format(node))
-        # Parent call
-        super(local_attribute, self).run_callback(device, node)
 
     # Properties
 
@@ -176,6 +150,15 @@ class local_attribute(node_object):
             lambda device, value:
                 device.write_to_node(device.graph[key], value))
 
+    def configure(self, device):
+        super(local_attribute, self).configure(device)
+        node = device.graph[self.key]
+        # Add push event callback
+        node.callbacks.append(partial(
+            device.run_callback,
+            "pushing events for",
+            device.push_event_for_node))
+
 
 # Logical attribute
 
@@ -193,7 +176,7 @@ class logical_attribute(local_attribute, logical_object):
 
 # Proxy attribute
 
-class proxy_attribute(local_attribute, logical_object):
+class proxy_attribute(logical_attribute):
     """Tango attribute linked to the attribute of a remote device.
 
     Args:
@@ -204,7 +187,7 @@ class proxy_attribute(local_attribute, logical_object):
     """
 
     def __init__(self, prop, **kwargs):
-        super(proxy_attribute, self).__init__(**kwargs)
+        local_attribute.__init__(self, **kwargs)
         self.prop = prop
 
     @property
@@ -259,10 +242,10 @@ class proxy_attribute(local_attribute, logical_object):
 
 # Combined attribute
 
-class combined_attribute(local_attribute, logical_object):
+class combined_attribute(logical_attribute):
 
     def __init__(self, prop, **kwargs):
-        super(combined_attribute, self).__init__(**kwargs)
+        local_attribute.__init__(self, **kwargs)
         self.prop = prop
         if self.writable:
             raise ValueError('A combined attribute cannot be writable')
@@ -278,8 +261,8 @@ class combined_attribute(local_attribute, logical_object):
         # Check method
         if self.method is None:
             raise ValueError('Method not defined')
-        # Skip parent call
-        node_object.configure(self, device)
+        # Skip parent call to set the binding later
+        local_attribute.configure(self, device)
         # Get node
         node = device.graph[self.key]
         node.subnodes = []
