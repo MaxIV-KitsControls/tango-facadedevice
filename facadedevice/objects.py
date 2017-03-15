@@ -52,7 +52,7 @@ class node_object(class_object):
             return
         # Add user callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device.safe_callback,
             "running user callback for",
             self.callback.__get__(device)(node)))
 
@@ -127,7 +127,7 @@ class local_attribute(node_object):
         node = device.graph[self.key]
         # Add push event callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device.safe_callback,
             "pushing events for",
             device.push_event_for_node))
 
@@ -187,7 +187,7 @@ class proxy_attribute(logical_attribute):
         # Set write method
         dct[key] = dct[key].setter(
             lambda device, value:
-                device.write_attribute_from_property(self.prop, value))
+                device.write_remote_attribute_from_property(self.prop, value))
 
     def configure_binding(self, device, node):
         # Get properties
@@ -275,7 +275,7 @@ class state_attribute(node_object):
         node = device.graph[self.key]
         # Add set state callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device.safe_callback,
             "setting the state from",
             device.set_state_from_node))
         # Bind node
@@ -300,22 +300,15 @@ class proxy_command(class_object):
     Also supports the standard command keywords.
     """
 
-    method = None
-
     def __init__(self, prop, attr=False, **kwargs):
         self.prop = prop
         self.attr = attr
         self.kwargs = kwargs
+        self.method = None
 
     def __call__(self, method):
         self.method = method
         return self
-
-    def run_command(self, device, func, *args):
-        """Write the attribute of the remote device with the value."""
-        name = getattr(device, self.prop)
-        subcommand = make_subcommand(name, attr=self.attr)
-        return func(subcommand, *args)
 
     def update_class(self, key, dct):
         # Check method
@@ -323,9 +316,11 @@ class proxy_command(class_object):
             raise ValueError('No method defined')
         # Set command
         decorator = command(**self.kwargs)
+        factory = partial(make_subcommand, attr=self.attr)
         dct[key] = decorator(
             lambda device, *args:
-                self.run_command(device, self.method.__get__(device), *args))
+                device.run_proxy_command(
+                    factory, self.prop, self.method.__get__(device), *args))
         dct[key].__name__ = key
         # Set is allowed method
         method_name = "is_" + key + "_allowed"
@@ -336,5 +331,6 @@ class proxy_command(class_object):
         dct[self.prop] = device_property(dtype=str)
 
     def configure(self, device):
+        # Check subcommand
         name = getattr(device, self.prop)
         make_subcommand(name, attr=self.attr)

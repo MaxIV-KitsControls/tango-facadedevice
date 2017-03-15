@@ -7,7 +7,7 @@ import time
 from facadedevice.base import triplet, Graph, context
 
 # Common imports
-from facadedevice.common import EnhancedDevice, debug_it, aggregate_qualities
+from facadedevice.common import EnhancedDevice, aggregate_qualities
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute
@@ -65,14 +65,24 @@ class Facade(_Facade):
     def graph(self):
         return self._graph
 
-    # Helpers
+    # Initialization
 
-    def write_attribute_from_property(self, prop, value):
-        attr = getattr(self, prop)
-        proxy = AttributeProxy(attr)
-        proxy.write(value)
+    def init_device(self):
+        """Initialize the device."""
+        self._graph = Graph()
+        # Configure
+        for value in self._class_dict.values():
+            with context('configuring', value):
+                value.configure(self)
+        # Build graph
+        with context('building', self._graph):
+            self._graph.build()
+        # Connect
+        for value in self._class_dict.values():
+            with context('connecting', value):
+                value.connect(self)
 
-    # Events handling
+    # Event subscription
 
     def subscribe_for_node(self, attr, node):
         try:
@@ -99,9 +109,10 @@ class Facade(_Facade):
             self.info_stream(msg.format(attr))
             return EventType.CHANGE_EVENT
 
-    @debug_it
+    # Event callback
+
     def on_node_event(self, node, event):
-        """Handle attribute events."""
+        """Handle node events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event."
@@ -126,7 +137,66 @@ class Facade(_Facade):
         value = triplet.from_attr_value(event.attr_value)
         node.set_result(value)
 
-    # Push events
+    # Client requests
+
+    def read_from_node(self, node, attr=None):
+        """Used when reading an attribute"""
+        if node.result() is None:
+            return
+        value, stamp, quality = node.result()
+        if attr:
+            attr.set_value_date_quality(value, stamp, quality)
+        return value, stamp, quality
+
+    def write_to_node(self, node, value):
+        """Used when writing a local attribute"""
+        result = triplet(value, time.time())
+        node.set_result(result)
+
+    def write_remote_attribute_from_property(self, prop, value):
+        """Used when writing a proxy attribute"""
+        attr = getattr(self, prop)
+        proxy = AttributeProxy(attr)
+        proxy.write(value)
+
+    def run_proxy_command(self, factory, prop, func, *args):
+        """Used when running a proxy command"""
+        subcommand = factory(getattr(self, prop))
+        return func(subcommand, *args)
+
+    # Controlled callbacks
+
+    def safe_callback(self, ctx, func, node):
+        """Contexualize different node callbacks."""
+        try:
+            with context(ctx, node):
+                func(node)
+        except Exception as exc:
+            self.ignore_exception(exc)
+
+    def aggregate_for_node(self, node, func, *nodes):
+        """Contextualize result and exception propagation."""
+        with context("updating", node):
+            # Forward first exception
+            for node in nodes:
+                if node.exception() is not None:
+                    raise node.exception()
+            # Shortcut for empty nodes
+            results = [node.result() for node in nodes]
+            if any(result is None for result in results):
+                return
+            # Exctract values
+            values, stamps, qualities = zip(*results)
+            result = func(*values)
+            # Return triplet
+            if isinstance(result, triplet):
+                return result
+            # Create triplet
+            stamp = max(stamps)
+            quality = aggregate_qualities(qualities)
+            return triplet(result, stamp, quality)
+
+    # Dedicated callbacks
 
     def set_state_from_node(self, node):
         if node.exception() is not None:
@@ -161,66 +231,7 @@ class Facade(_Facade):
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
 
-    # Read / write nodes
-
-    def read_from_node(self, node, attr=None):
-        if node.result() is None:
-            return
-        value, stamp, quality = node.result()
-        if attr:
-            attr.set_value_date_quality(value, stamp, quality)
-        return value, stamp, quality
-
-    def write_to_node(self, node, value):
-        result = triplet(value, time.time())
-        node.set_result(result)
-
-    # Safe callbacks
-
-    def run_callback(self, ctx, func, node):
-        try:
-            with context(ctx, node):
-                func(node)
-        except Exception as exc:
-            self.ignore_exception(exc)
-
-    def aggregate_for_node(self, node, func, *nodes):
-        with context("updating", node):
-            # Forward first exception
-            for node in nodes:
-                if node.exception() is not None:
-                    raise node.exception()
-            # Shortcut for empty nodes
-            results = [node.result() for node in nodes]
-            if any(result is None for result in results):
-                return
-            # Exctract values
-            values, stamps, qualities = zip(*results)
-            result = func(*values)
-            # Return triplet
-            if isinstance(result, triplet):
-                return result
-            # Create triplet
-            stamp = max(stamps)
-            quality = aggregate_qualities(qualities)
-            return triplet(result, stamp, quality)
-
-    # Initialization and cleanup
-
-    def init_device(self):
-        """Initialize the device."""
-        self._graph = Graph()
-        # Configure
-        for value in self._class_dict.values():
-            with context('configuring', value):
-                value.configure(self)
-        # Build graph
-        with context('building', self._graph):
-            self._graph.build()
-        # Connect
-        for value in self._class_dict.values():
-            with context('connecting', value):
-                value.connect(self)
+    # Clean up
 
     def delete_device(self):
         # Reset graph
