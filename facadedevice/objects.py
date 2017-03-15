@@ -56,53 +56,20 @@ class node_object(class_object):
             "running user callback for",
             self.callback.__get__(device)(node)))
 
+    # Binding helper
 
-# Logical object
-
-class logical_object(node_object):
-    """Logical object."""
-
-    method = None
-
-    def __init__(self, bind=None):
-        self.bind = bind
-
-    def __call__(self, method):
-        self.method = method
-        return self
-
-    # Configuration methods
-
-    def configure(self, device):
-        super(logical_object, self).configure(device)
-        node = device.graph[self.key]
-        # Check values
-        if self.bind and not self.method:
+    @staticmethod
+    def bind_node(device, node, bind, method):
+        if not method:
             raise ValueError('No update method defined')
-        if not self.bind and self.method:
+        if not bind:
             raise ValueError('Update method not bound')
-        # Add aggregation rule
-        if self.bind and self.method:
-            func = partial(
-                device.aggregate_for_node,
-                node,
-                self.method.__get__(device))
-            device.graph.add_rule(node, func, self.bind)
-
-
-# State attribute
-
-class state_attribute(logical_object):
-    """Tango state attribute with event support."""
-
-    def configure(self, device):
-        super(state_attribute, self).configure(device)
-        node = device.graph[self.key]
-        # Add set state callback
-        node.callbacks.append(partial(
-            device.run_callback,
-            "setting the state from",
-            device.set_state_from_node))
+        # Set the binding
+        func = partial(
+            device.aggregate_for_node,
+            node,
+            method.__get__(device))
+        device.graph.add_rule(node, func, bind)
 
 
 # Local attribute
@@ -140,6 +107,11 @@ class local_attribute(node_object):
         # Read method
         kwargs['fget'] = lambda device, attr=None: \
             device.read_from_node(device.graph[key], attr)
+        # Is allowed method
+        method_name = "is_" + key + "_allowed"
+        if method_name not in dct:
+            dct[method_name] = lambda device, attr: device.connected
+            dct[method_name].__name__ = method_name
         # Create attribute
         dct[key] = attribute(**kwargs)
         # Read-only
@@ -162,7 +134,7 @@ class local_attribute(node_object):
 
 # Logical attribute
 
-class logical_attribute(local_attribute, logical_object):
+class logical_attribute(local_attribute):
     """Tango attribute computed from the values of other attributes.
 
     Use it as a decorator to register the function that make this computation.
@@ -170,8 +142,21 @@ class logical_attribute(local_attribute, logical_object):
     """
 
     def __init__(self, bind, **kwargs):
-        logical_object.__init__(self, bind)
-        local_attribute.__init__(self, **kwargs)
+        self.bind = bind
+        self.method = None
+        super(logical_attribute, self).__init__(**kwargs)
+
+    def __call__(self, method):
+        self.method = method
+        return self
+
+    def configure(self, device):
+        super(logical_attribute, self).configure(device)
+        node = device.graph[self.key]
+        self.configure_binding(device, node)
+
+    def configure_binding(self, device, node):
+        self.bind_node(device, node, self.bind, self.method)
 
 
 # Proxy attribute
@@ -187,12 +172,8 @@ class proxy_attribute(logical_attribute):
     """
 
     def __init__(self, prop, **kwargs):
-        local_attribute.__init__(self, **kwargs)
         self.prop = prop
-
-    @property
-    def bind(self):
-        return (self.key + "[0]",) if self.method else ()
+        super(proxy_attribute, self).__init__(None, **kwargs)
 
     def update_class(self, key, dct):
         # Parent method
@@ -208,63 +189,53 @@ class proxy_attribute(logical_attribute):
             lambda device, value:
                 device.write_attribute_from_property(self.prop, value))
 
-    def configure(self, device):
-        # Parent call
-        super(proxy_attribute, self).configure(device)
-        # Get node
-        node = device.graph[self.key]
+    def configure_binding(self, device, node):
         # Get properties
         attr = getattr(device, self.prop).strip().lower()
         # Ignore attribute
         if attr == NONE_STRING:
-            node.remote_attr = None
-            node.subnode = None
+            node.subnodes = []
             return
         # Add attribute
         if self.method is None:
             node.remote_attr = attr
-            node.subnode = node
+            node.subnodes = [node]
             return
         # Add subnode
-        node.subnode = RestrictedNode(self.bind[0])
-        device.graph.add_node(node.subnode)
-        node.remote_attr = node.subnode.remote_attr = attr
+        bind = (self.key + "[0]",)
+        subnode = RestrictedNode(bind[0])
+        subnode.remote_attr = attr
+        node.subnodes = [subnode]
+        device.graph.add_node(subnode)
+        # Binding
+        self.bind_node(device, node, bind, self.method)
 
     def connect(self, device):
         # Get node
         node = device.graph[self.key]
-        # Ignore empty subnode
-        if node.subnode is None:
-            return
         # Subscribe
-        device.subscribe_for_node(node.remote_attr, node.subnode)
+        for subnode in node.subnodes:
+            device.subscribe_for_node(subnode.remote_attr, subnode)
 
 
 # Combined attribute
 
-class combined_attribute(logical_attribute):
+class combined_attribute(proxy_attribute):
 
     def __init__(self, prop, **kwargs):
-        local_attribute.__init__(self, **kwargs)
-        self.prop = prop
+        super(combined_attribute, self).__init__(prop, **kwargs)
         if self.writable:
             raise ValueError('A combined attribute cannot be writable')
 
     def update_class(self, key, dct):
         # Parent method
         super(combined_attribute, self).update_class(key, dct)
-        # Create device property
+        # Override device property
         doc = "Attributes to be combined as {}.".format(key)
         dct[self.prop] = device_property(dtype=(str,), doc=doc)
 
-    def configure(self, device):
-        # Check method
-        if self.method is None:
-            raise ValueError('Method not defined')
-        # Skip parent call to set the binding later
-        local_attribute.configure(self, device)
-        # Get node
-        node = device.graph[self.key]
+    def configure_binding(self, device, node):
+        # Init subnodes
         node.subnodes = []
         # Strip property
         attrs = getattr(device, self.prop)
@@ -282,16 +253,33 @@ class combined_attribute(logical_attribute):
             device.graph.add_node(subnode)
             node.subnodes.append(subnode)
         # Set the binding
-        bind = tuple(node.name for node in node.subnodes)
-        func = partial(self.aggregate, node, self.method.__get__(device))
-        device.graph.add_rule(node, func, bind)
+        bind = tuple(subnode.name for subnode in node.subnodes)
+        self.bind_node(device, node, bind, self.method)
 
-    def connect(self, device):
-        # Get node
+
+# State attribute
+
+class state_attribute(node_object):
+    """Tango state attribute with event support."""
+
+    def __init__(self, bind):
+        self.bind = bind
+        self.method = None
+
+    def __call__(self, method):
+        self.method = method
+        return self
+
+    def configure(self, device):
+        super(state_attribute, self).configure(device)
         node = device.graph[self.key]
-        # Subscribe
-        for subnode in node.subnodes:
-            device.subscribe_for_node(subnode.remote_attr, subnode)
+        # Add set state callback
+        node.callbacks.append(partial(
+            device.run_callback,
+            "setting the state from",
+            device.set_state_from_node))
+        # Bind node
+        self.bind_node(device, node, self.bind, self.method)
 
 
 # Proxy command
@@ -342,7 +330,7 @@ class proxy_command(class_object):
         # Set is allowed method
         method_name = "is_" + key + "_allowed"
         if method_name not in dct:
-            dct[method_name] = lambda device: device.connected
+            dct[method_name] = lambda device, attr: device.connected
             dct[method_name].__name__ = method_name
         # Create properties
         dct[self.prop] = device_property(dtype=str)
