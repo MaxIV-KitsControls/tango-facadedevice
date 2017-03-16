@@ -9,6 +9,8 @@ from tango.server import device_property, command, attribute
 
 # Local imports
 from facadedevice.graph import RestrictedNode
+from facadedevice.utils import attributes_from_wildcard
+from facadedevice.utils import check_attribute, make_subcommand
 
 # Constants
 
@@ -95,13 +97,9 @@ class local_attribute(node_object):
     # Properties
 
     @property
-    def writable(self):
-        return (self.kwargs.get('access') == AttrWriteType.READ_WRITE or
-                self.custom_writable)
-
-    @property
-    def custom_writable(self):
-        return set(self.kwargs) & set(['fwrite', 'fset'])
+    def use_default_write(self):
+        return (self.kwargs.get('access') == AttrWriteType.READ_WRITE and
+                not set(self.kwargs) & set(['fwrite', 'fset']))
 
     # Configuration methods
 
@@ -119,7 +117,7 @@ class local_attribute(node_object):
         # Create attribute
         dct[key] = attribute(**kwargs)
         # Read-only
-        if not self.writable or self.custom_writable:
+        if not self.use_default_write:
             return
         # Set write method
         dct[key] = dct[key].setter(
@@ -185,8 +183,8 @@ class proxy_attribute(logical_attribute):
         # Create device property
         doc = "Attribute to be forwarded as {}.".format(key)
         dct[self.prop] = device_property(dtype=str, doc=doc)
-        # Read-only
-        if not self.writable or self.custom_writable:
+        # Read-only or custom write
+        if not self.use_default_write:
             return
         # Set write method
         dct[key] = dct[key].setter(
@@ -200,6 +198,8 @@ class proxy_attribute(logical_attribute):
         if attr == NONE_STRING:
             node.subnodes = []
             return
+        # Check attribute
+        check_attribute(attr, writable=self.use_default_write)
         # Add attribute
         if self.method is None:
             node.remote_attr = attr
@@ -250,8 +250,15 @@ class combined_attribute(proxy_attribute):
         # Ignore attribute
         if len(attrs) == 1 and attrs[0] == NONE_STRING:
             return
+        # Pattern matching
+        if len(attrs) == 1:
+            attrs = list(attributes_from_wildcard(attrs[0]))
+        # Check attributes
+        else:
+            for attr in attrs:
+                check_attribute(attr)
         # Build the subnodes
-        for i, attr in enumerate(check_attributes(attrs)):
+        for i, attr in enumerate(attrs):
             subnode = RestrictedNode('{}[{}]'.format(self.key, i))
             subnode.remote_attr = attr
             device.graph.add_node(subnode)
@@ -346,6 +353,9 @@ class proxy_command(class_object):
         dct[self.prop] = device_property(dtype=str)
 
     def configure(self, device):
+        name = getattr(device, self.prop).strip().lower()
+        # Disabled command
+        if name == NONE_STRING:
+            return
         # Check subcommand
-        name = getattr(device, self.prop)
         make_subcommand(name, attr=self.attr)

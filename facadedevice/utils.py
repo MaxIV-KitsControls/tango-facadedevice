@@ -2,16 +2,15 @@
 
 # Imports
 import time
-import ctypes
-import threading
-import functools
+import fnmatch
 import itertools
+import functools
 import traceback
 import collections
 
 # Tango imports
 from tango.server import Device, command
-from tango import AutoTangoMonitor, DeviceProxy, LatestDeviceImpl
+from tango import AutoTangoMonitor, Database, DeviceProxy, LatestDeviceImpl
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, DispLevel
 
 
@@ -37,11 +36,11 @@ def safe_traceback(limit=None):
 
 # Aggregate qualities
 
+
 def aggregate_qualities(qualities):
     length = len(AttrQuality.values)
-    t1 = lambda x: (int(x) - 1) % length
-    t2 = lambda x: (int(x) + 1) % length
-    result = t2(min(map(t1, qualities)))
+    sortable = map(lambda x: (x-1) % length, qualities)
+    result = (min(sortable) + 1) % length
     return AttrQuality.values[result]
 
 
@@ -53,43 +52,59 @@ def create_device_proxy(*args, **kwargs):
     return proxy
 
 
-# Writable attribute check
+# Split attribute name
 
-def is_writable_attribute(attr_name, device_proxy):
-    """ Return if tango attribute exists and is writable, and also return
-     string description """
-    desc = "Attribute {0}/{1} is writable"
-    writable = True
-    try:
-        # get attribute configuration
-        cfg = device_proxy.get_attribute_config(attr_name)
-        if cfg.writable is AttrWriteType.READ:
-            # attribute exists but it is not writable
-            desc = "Attribute {0}/{1} is not writable"
-            writable = False
-    except DevFailed:
-        # attribute doesn't exist
-        desc = "Can't find attribute {0}/{1} "
-        writable = False
-    desc = desc.format(device_proxy.name(), attr_name)
-    return writable, desc
+def split_tango_name(name):
+    lst = name.split('/')
+    return '/'.join(lst[:-1]), lst[-1]
+
+
+# Attribute check
+
+def check_attribute(name, writable=False):
+    device, attr = split_tango_name(name)
+    proxy = create_device_proxy(device)
+    cfg = proxy.get_attribute_config(attr)
+    if writable and cfg.writable is AttrWriteType.READ:
+        raise ValueError("The attribute is not writable")
+    return cfg
+
+
+# Attribute from wildcard
+
+def attributes_from_wildcard(wildcard):
+    db = Database()
+    wdev, wattr = split_tango_name(wildcard)
+    for device in db.get_device_exported(wdev):
+        proxy = create_device_proxy(device)
+        infos = proxy.attribute_list_query()
+        attrs = sorted(info.name for info in infos)
+        for attr in fnmatch(attrs, wattr):
+            yield '{}/{}'.format(device, attr)
 
 
 # Tango command check
 
-def tango_command_exist(cmd_name, device_proxy):
-    """ Return if tango command exist and return string description."""
-    desc = "Command {0}/{1} exists"
-    cmd_exists = True
-    try:
-        # check command description
-        device_proxy.command_query(cmd_name)
-    except DevFailed:
-        # command_query failed, command doesn't exist
-        desc += "-Command {0}/{1} doesn't exist'\n"
-        cmd_exists = False
-    desc = desc.format(device_proxy.name(), cmd_name)
-    return cmd_exists, desc
+def check_command(name):
+    device, cmd = split_tango_name(name)
+    proxy = create_device_proxy(device)
+    return proxy.command_query(cmd)
+
+
+# Make subcommand
+
+def make_subcommand(name, attr=False):
+    # Check value
+    if attr:
+        check_attribute(name)
+    else:
+        check_command()
+    # Create proxy
+    device, obj = split_tango_name()
+    proxy = create_device_proxy(device)
+    # Make subcommand
+    method = proxy.write_attribute if attr else proxy.command_inout
+    return functools.partial(method, obj)
 
 
 # Device class
@@ -206,8 +221,7 @@ class EnhancedDevice(Device):
                         filters=[], stateless=False, proxy=None):
         # Get proxy
         if proxy is None:
-            device_name = '/'.join(attr_name.split('/')[:-1])
-            attr_name = attr_name.split('/')[-1]
+            device_name, attr_name = split_tango_name(attr_name)
             proxy = create_device_proxy(device_name)
         # Create callback
         eid = next(self._eid_counter)
