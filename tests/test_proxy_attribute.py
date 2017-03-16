@@ -34,13 +34,13 @@ def test_proxy_attribute(mocker):
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         utils.create_device_proxy.assert_called_with('a/b/c')
-        subscribe_event.assert_called()
+        assert subscribe_event.called
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False
         subscribe_event.assert_called_with(*args)
         # No event pushed
-        change_events['attr'].assert_not_called
-        archive_events['attr'].assert_not_called
+        change_events['attr'].assert_not_called()
+        archive_events['attr'].assert_not_called()
         # Trigger events
         event = Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
@@ -79,13 +79,13 @@ def test_proxy_attribute_with_convertion(mocker):
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         utils.create_device_proxy.assert_called_with('a/b/c')
-        subscribe_event.assert_called()
+        assert subscribe_event.called
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False
         subscribe_event.assert_called_with(*args)
         # No event pushed
-        change_events['attr'].assert_not_called
-        archive_events['attr'].assert_not_called
+        change_events['attr'].assert_not_called()
+        archive_events['attr'].assert_not_called()
         # Trigger events
         event = Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
@@ -126,13 +126,13 @@ def test_writable_proxy_attribute(mocker):
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         utils.create_device_proxy.assert_called_with('a/b/c')
-        subscribe_event.assert_called()
+        assert subscribe_event.called
         cb = subscribe_event.call_args[0][2]
         args = 'd', EventType.CHANGE_EVENT, cb, [], False
         subscribe_event.assert_called_with(*args)
         # No event pushed
-        change_events['attr'].assert_not_called
-        archive_events['attr'].assert_not_called
+        change_events['attr'].assert_not_called()
+        archive_events['attr'].assert_not_called()
         # Trigger events
         event = Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
