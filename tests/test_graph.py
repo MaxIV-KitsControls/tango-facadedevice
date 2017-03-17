@@ -3,7 +3,7 @@ import mock
 import numpy
 import pytest
 
-from facadedevice.graph import Node, triplet, Graph
+from facadedevice.graph import Node, RestrictedNode, Graph, triplet
 from facadedevice.graph import VALID, INVALID
 
 
@@ -297,3 +297,11 @@ def test_wrong_graph():
     g.add_rule(b, lambda a: a.result(), ['a'])
     with pytest.raises(ValueError):
         g.add_rule(b, lambda a: a.result(), ['a'])
+
+
+def test_restricted_triplet():
+    node = RestrictedNode('a')
+    node.set_result(triplet(0., 0.))
+    assert node.result() == triplet(0., 0.)
+    with pytest.raises(TypeError):
+        node.set_result(0.)

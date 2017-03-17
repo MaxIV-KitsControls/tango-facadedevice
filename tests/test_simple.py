@@ -2,7 +2,6 @@
 
 # Imports
 import time  # noqa
-from mock import Mock
 from collections import defaultdict
 
 from tango import DevState
@@ -13,12 +12,12 @@ from facadedevice.graph import VALID
 from facadedevice import Facade, TimedFacade, state_attribute
 
 
-def event_mock(cls):
-    change = defaultdict(Mock)
-    archive = defaultdict(Mock)
-    cls.push_change_event = Mock(
+def event_mock(mocker, cls):
+    change = defaultdict(mocker.Mock)
+    archive = defaultdict(mocker.Mock)
+    cls.push_change_event = mocker.Mock(
         side_effect=lambda key, *args, **kwargs: change[key](*args, **kwargs))
-    cls.push_archive_event = Mock(
+    cls.push_archive_event = mocker.Mock(
         side_effect=lambda key, *args, **kwargs: archive[key](*args, **kwargs))
     return change, archive
 
@@ -30,7 +29,7 @@ def test_empty_device(mocker):
 
     time.time
     mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
 
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.UNKNOWN
@@ -50,7 +49,7 @@ def test_simple_device(mocker):
 
     time.time
     mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
 
     with DeviceTestContext(Test, debug=3) as proxy:
         assert proxy.state() == DevState.ON
@@ -73,7 +72,7 @@ def test_state_error(mocker):
 
     time.time
     mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
     expected_status = "Exception while updating node <State>:\n"
     expected_status += "  RuntimeError('Ooops',)"
 

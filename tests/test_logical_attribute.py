@@ -34,7 +34,7 @@ def test_logical_attribute(mocker):
             dtype=float,
             access=AttrWriteType.READ_WRITE)
 
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
     mocker.patch('time.time').return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
@@ -86,7 +86,7 @@ def test_diamond_attribute(mocker):
         def D(self, a, b, c):
             return a + b + c
 
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
     mocker.patch('time.time').return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:

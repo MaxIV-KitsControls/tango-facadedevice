@@ -8,7 +8,7 @@ from tango import DevState, EventType, EventData, AttrQuality
 from tango import AttrWriteType
 
 # Proxy imports
-from facadedevice import Facade, proxy_attribute, utils, device
+from facadedevice import Facade, proxy_attribute, utils
 
 # Local imports
 from test_simple import event_mock
@@ -22,7 +22,7 @@ def test_proxy_attribute(mocker):
             dtype=float,
             prop='prop')
 
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
 
     mocker.patch('facadedevice.utils.create_device_proxy')
     inner_proxy = utils.create_device_proxy.return_value
@@ -67,7 +67,7 @@ def test_proxy_attribute_with_convertion(mocker):
         def attr(self, raw):
             return raw*10
 
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
 
     mocker.patch('facadedevice.utils.create_device_proxy')
     inner_proxy = utils.create_device_proxy.return_value
@@ -111,15 +111,12 @@ def test_writable_proxy_attribute(mocker):
             prop='prop',
             access=AttrWriteType.READ_WRITE)
 
-    change_events, archive_events = event_mock(Test)
+    change_events, archive_events = event_mock(mocker, Test)
 
     mocker.patch('facadedevice.utils.create_device_proxy')
     inner_proxy = utils.create_device_proxy.return_value
     inner_proxy.dev_name.return_value = 'a/b/c'
     subscribe_event = inner_proxy.subscribe_event
-
-    mocker.patch('facadedevice.device.AttributeProxy')
-    inner_attr_proxy = device.AttributeProxy.return_value
 
     with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
         # Device not in fault
@@ -148,6 +145,7 @@ def test_writable_proxy_attribute(mocker):
         change_events['attr'].assert_called_with(*expected)
         archive_events['attr'].assert_called_with(*expected)
         # Test write
+        utils.create_device_proxy.reset_mock()
         proxy.write_attribute('attr', 32.)
-        device.AttributeProxy.assert_called_with('a/b/c/d')
-        inner_attr_proxy.write_attribute.called_with(32.)
+        utils.create_device_proxy.assert_called_with('a/b/c')
+        inner_proxy.write_attribute.assert_called_with('d', 32.)
