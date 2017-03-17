@@ -14,15 +14,6 @@ from tango import AutoTangoMonitor, Database, DeviceProxy, LatestDeviceImpl
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, DispLevel
 
 
-# Numpy print options
-
-try:
-    import numpy
-    numpy.set_printoptions(precision=5, threshold=6)
-except Exception:
-    print("Couldn't customize numpy print options")
-
-
 # Constants
 
 ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
@@ -98,9 +89,9 @@ def make_subcommand(name, attr=False):
     if attr:
         check_attribute(name)
     else:
-        check_command()
+        check_command(name)
     # Create proxy
-    device, obj = split_tango_name()
+    device, obj = split_tango_name(name)
     proxy = create_device_proxy(device)
     # Make subcommand
     method = proxy.write_attribute if attr else proxy.command_inout
@@ -122,7 +113,10 @@ class EnhancedDevice(Device):
 
     def register_exception(self, exc, msg="", ignore=False):
         # Stream traceback
-        self.debug_stream(safe_traceback())
+        if getattr(exc, 'traceback', None):
+            self.debug_stream(exc.traceback)
+        else:
+            self.debug_stream(safe_traceback())
         # Convert DevFailed
         if isinstance(exc, DevFailed) and exc.args:
             exc = exc.args[0]

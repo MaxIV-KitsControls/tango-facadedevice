@@ -14,7 +14,6 @@ from facadedevice.objects import class_object, local_attribute
 
 # Tango imports
 from tango.server import command
-from tango import AttributeProxy
 from tango import DevFailed, DevState, EventData, EventType, DispLevel
 
 
@@ -153,16 +152,16 @@ class Facade(_Facade):
         result = triplet(value, time.time())
         node.set_result(result)
 
-    def write_remote_attribute_from_property(self, prop, value):
+    def run_proxy_command(self, factory, prop, value):
         """Used when writing a proxy attribute"""
-        attr = getattr(self, prop)
-        proxy = AttributeProxy(attr)
-        proxy.write(value)
-
-    def run_proxy_command(self, factory, prop, func, *args):
-        """Used when running a proxy command"""
         subcommand = factory(getattr(self, prop))
-        return func(subcommand, *args)
+        subcommand(value)
+
+    def run_proxy_command_context(self, factory, prop, ctx, *values):
+        """Used when running a proxy command"""
+        print(self, factory, prop, ctx, values)
+        subcommand = factory(getattr(self, prop))
+        return ctx(subcommand, *values)
 
     # Controlled callbacks
 

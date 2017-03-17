@@ -61,7 +61,7 @@ class node_object(class_object):
         node.callbacks.append(partial(
             device.safe_callback,
             "running user callback for",
-            self.callback.__get__(device)(node)))
+            self.callback.__get__(device)))
 
     # Binding helper
 
@@ -187,9 +187,11 @@ class proxy_attribute(logical_attribute):
         if not self.use_default_write:
             return
         # Set write method
+        factory = partial(make_subcommand, attr=True)
         dct[key] = dct[key].setter(
             lambda device, value:
-                device.write_remote_attribute_from_property(self.prop, value))
+                device.run_proxy_command(
+                    factory, self.prop, value))
 
     def configure_binding(self, device, node):
         # Get properties
@@ -228,7 +230,7 @@ class combined_attribute(proxy_attribute):
 
     def __init__(self, prop, **kwargs):
         super(combined_attribute, self).__init__(prop, **kwargs)
-        if self.writable:
+        if self.use_default_write:
             raise ValueError('A combined attribute cannot be writable')
 
     def update_class(self, key, dct):
@@ -337,17 +339,16 @@ class proxy_command(class_object):
         if not self.method:
             raise ValueError('No method defined')
         # Set command
-        decorator = command(**self.kwargs)
         factory = partial(make_subcommand, attr=self.attr)
-        dct[key] = decorator(
-            lambda device, *args:
-                device.run_proxy_command(
-                    factory, self.prop, self.method.__get__(device), *args))
+        dct[key] = lambda device, *args: \
+            device.run_proxy_command_context(
+                 factory, self.prop, self.method.__get__(device), *args)
         dct[key].__name__ = key
+        dct[key] = command(**self.kwargs)(dct[key])
         # Set is allowed method
         method_name = "is_" + key + "_allowed"
         if method_name not in dct:
-            dct[method_name] = lambda device, attr: device.connected
+            dct[method_name] = lambda device: device.connected
             dct[method_name].__name__ = method_name
         # Create properties
         dct[self.prop] = device_property(dtype=str)
