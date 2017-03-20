@@ -36,24 +36,24 @@ Usage
 
 The facade devices support the following objects:
 
-- **proxy_attribute**: TANGO attribute linked to the attribute of a remote
-  device. Full attribute name is given as property. It supports the
-  standard attribute keywords. Optionally, a conversion method can be given.
+- **local_attribute**: tango attribute holding a local value. Useful for
+configuring the device at runtime.
 
-- **logical_attribute**: TANGO attribute computed from the values of other
+- **logical_attribute**: tango attribute computed from the values of other
   attributes. Use it as a decorator to register the function that make this
   computation.
 
 - **state_attribute**: It is used to describe the logical relationship between
   state/status and the other attributes. It is very similar to logical attributes.
 
-- **combined_attribute**: TANGO attribute computed from the values of other
+- **proxy_attribute**: tango attribute bound to the attribute of a remote
+  device. Full attribute name is given as property. It supports the
+  standard attribute keywords. Optionally, a conversion method can be given.
+
+- **combined_attribute**: tango attribute computed from the values of other
   remote attributes. Use it as a decorator to register the function that make
   this computation. The remote attribute names are provided by a property,
   either as a list or a pattern.
-
-- **local_attribute**: TANGO attribute holding a local value. Useful for configuring
-  the device at runtime.
 
 - **proxy_command**: TANGO command to write an attribute of a remote device
   with a given value. The full attribute name is given as a property. It
@@ -70,18 +70,17 @@ Example
 -------
 
 ```python
-# Example
 class CameraScreen(Facade):
 
     # Proxy attributes
 
     StatusIn = proxy_attribute(
         dtype=bool,
-        prop="StatusInAttribute")
+        prop="StatusInTag")
 
     StatusOut = proxy_attribute(
         dtype=bool,
-        prop="StatusOutAttribute")
+        prop="StatusOutTag")
 
     # Logical attributes
 
@@ -94,20 +93,21 @@ class CameraScreen(Facade):
     # Proxy commands
 
     @proxy_command(
-        prop="MoveInAttr",
+        prop="MoveInTag",
         attr=True)
     def MoveIn(self, subcommand):
         subcommand(1)
 
     @proxy_command(
-        prop="MoveOutAttr",
+        prop="MoveOutTag",
         attr=True)
     def MoveOut(self, subcommand):
         subcommand(1)
 
     # State and status
 
-    @state_attribute
+    @state_attribute(
+	    bind=['Error', 'StatusIn'])
     def state(self, error, status_in):
         if error:
             return DevState.FAULT, "Conflict between IN and OUT"
@@ -120,7 +120,11 @@ class CameraScreen(Facade):
 Unit testing
 ------------
 
-Statement coverage is currently greater than 72%.
+Run the tests using:
+
+```console
+$ python setup.py test
+```
 
 
 Documentation
