@@ -9,9 +9,9 @@ Information
 
  - Package: facadedevice
  - Device:  Facade (+ TimedFacade)
- - Repo:    [lib-maxiv-facadedevice][repo]
+ - Repo:    [tango-facadedevice][repo]
 
-[repo]: https://github.com/MaxIV-KitsControls/lib-maxiv-facadedevice.git
+[repo]: https://github.com/MaxIV-KitsControls/tango-facadedevice.git
 
 Requirements
 ------------
