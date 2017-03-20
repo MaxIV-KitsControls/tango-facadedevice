@@ -1,8 +1,9 @@
 
-import mock
+# Imports
 import numpy
 import pytest
 
+# Facade imports
 from facadedevice.graph import Node, RestrictedNode, Graph, triplet
 from facadedevice.graph import VALID, INVALID
 
@@ -33,8 +34,8 @@ def test_assert_triplet():
         triplet([1], 0.0, 'not a quality')
 
 
-def test_node_setters():
-    mocks = [mock.Mock() for _ in range(3)]
+def test_node_setters(mocker):
+    mocks = [mocker.Mock() for _ in range(3)]
     n = Node('test', description='desc', callbacks=mocks)
     assert n.name == 'test'
     assert n.description == 'desc'
@@ -106,8 +107,8 @@ def test_node_setters():
         assert not m.called
 
 
-def test_fail_node():
-    mocks = [mock.Mock(side_effect=RuntimeError)]
+def test_fail_node(mocker):
+    mocks = [mocker.Mock(side_effect=RuntimeError)]
     n = Node('test', description='desc', callbacks=mocks)
     assert n.name == 'test'
     assert n.description == 'desc'
@@ -129,7 +130,7 @@ def test_fail_node():
     assert "RuntimeError" in record[0].message.args[0]
 
 
-def test_simple_graph():
+def test_simple_graph(mocker):
     a = Node('a')
     b = Node('b')
     g = Graph()
@@ -151,8 +152,8 @@ def test_simple_graph():
     assert b.result() == 6
     g.reset()
     # Test 3
-    ma = mock.Mock()
-    mb = mock.Mock()
+    ma = mocker.Mock()
+    mb = mocker.Mock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
@@ -163,8 +164,8 @@ def test_simple_graph():
     mb.assert_called_once_with(b)
     g.reset()
     # Test 4
-    ma = mock.Mock()
-    mb = mock.Mock()
+    ma = mocker.Mock()
+    mb = mocker.Mock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
@@ -214,7 +215,7 @@ def test_cyclic_graph():
     assert "deadlock" in record[0].message.args[0]
 
 
-def test_diamond_graph():
+def test_diamond_graph(mocker):
     # Create graph
     graph = Graph()
     for x in "abcdefg":
@@ -262,7 +263,7 @@ def test_diamond_graph():
     # Test 3
     mocks = {}
     for x in "abcdefg":
-        mocks[x] = mock.Mock()
+        mocks[x] = mocker.Mock()
         graph[x].callbacks.append(mocks[x])
     graph['a'].set_result(2)
     assert graph['b'].result() == 20

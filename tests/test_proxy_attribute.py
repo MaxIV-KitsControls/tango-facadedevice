@@ -2,7 +2,6 @@
 
 # Imports
 import pytest
-from mock import Mock
 
 # Tango imports
 from tango.test_context import DeviceTestContext
@@ -44,7 +43,7 @@ def test_proxy_attribute(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Trigger events
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         event.errors = False
         event.attr_value.value = 1.2
@@ -89,7 +88,7 @@ def test_proxy_attribute_with_convertion(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Trigger events
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         event.errors = False
         event.attr_value.value = 1.2
@@ -133,7 +132,7 @@ def test_writable_proxy_attribute(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Trigger events
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         event.errors = False
         event.attr_value.value = 1.2
@@ -186,7 +185,7 @@ def test_proxy_attribute_with_periodic_event(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Trigger events
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         event.errors = False
         event.attr_value.value = 1.2
@@ -266,7 +265,7 @@ def test_proxy_attribute_with_wrong_events(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Ignore event
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         exception = DevFailed('Ooops')
         exception.reason = 'API_PollThreadOutOfSync'
@@ -276,7 +275,7 @@ def test_proxy_attribute_with_wrong_events(mocker):
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
         # Error event
-        event = Mock(spec=EventData)
+        event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
         exception = DevFailed('Ooops')
         event.errors = [exception, RuntimeError()]
