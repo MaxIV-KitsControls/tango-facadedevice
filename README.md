@@ -76,7 +76,7 @@ class CameraScreen(Facade):
     # Proxy attributes
 
     StatusIn = proxy_attribute(
-	    dtype=bool,
+        dtype=bool,
         prop="StatusInAttribute")
 
     StatusOut = proxy_attribute(
@@ -86,8 +86,8 @@ class CameraScreen(Facade):
     # Logical attributes
 
     @logical_attribute(
-		dtype=bool,
-		bind=['StatusIn', 'StatusOut'])
+        dtype=bool,
+        bind=['StatusIn', 'StatusOut'])
     def Error(self, status_in, status_out):
         return status_in == status_out
 
@@ -96,22 +96,22 @@ class CameraScreen(Facade):
     @proxy_command(
         prop="MoveInAttr",
         attr=True)
-	def MoveIn(self, subcommand):
-		subcommand(1)
+    def MoveIn(self, subcommand):
+        subcommand(1)
 
     @proxy_command(
         prop="MoveOutAttr",
         attr=True)
-	def MoveOut(self, subcommand):
-	    subcommand(1)
+    def MoveOut(self, subcommand):
+        subcommand(1)
 
     # State and status
 
-	@state_attribute
+    @state_attribute
     def state(self, error, status_in):
         if error:
             return DevState.FAULT, "Conflict between IN and OUT"
-		if status_in:
+        if status_in:
             return DevState.INSERT, "IN"
         return DevState.EXTRACT, "OUT"
 
