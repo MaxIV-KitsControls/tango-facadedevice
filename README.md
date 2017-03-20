@@ -1,5 +1,5 @@
-python-facadedevice
-===================
+tango-facadedevice
+==================
 ***
 
 Provide reactive facade devices to subclass.
