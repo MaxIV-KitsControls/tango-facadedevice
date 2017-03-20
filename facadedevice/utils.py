@@ -22,7 +22,10 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 # Safer traceback
 
 def safe_traceback(limit=None):
-    return traceback.format_exc(limit=limit).replace("%", "%%")
+    try:
+        return traceback.format_exc(limit=limit).replace("%", "%%")
+    except:
+        return ''  # pragma: no cover
 
 
 # Aggregate qualities
@@ -57,7 +60,7 @@ def check_attribute(name, writable=False):
     proxy = create_device_proxy(device)
     cfg = proxy.get_attribute_config(attr)
     if writable and cfg.writable is AttrWriteType.READ:
-        raise ValueError("The attribute is not writable")
+        raise ValueError("The attribute {} is not writable".format(name))
     return cfg
 
 
@@ -70,7 +73,7 @@ def attributes_from_wildcard(wildcard):
         proxy = create_device_proxy(device)
         infos = proxy.attribute_list_query()
         attrs = sorted(info.name for info in infos)
-        for attr in fnmatch(attrs, wattr):
+        for attr in fnmatch.filter(attrs, wattr):
             yield '{}/{}'.format(device, attr)
 
 
@@ -272,7 +275,7 @@ class EnhancedDevice(Device):
 
     @command(
         dtype_out=str,
-        doc_out="Information about polling and events.",
+        doc_out="Information about events and exceptions.",
         display_level=DispLevel.EXPERT)
     def GetInfo(self):
         lines = []

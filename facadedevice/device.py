@@ -10,7 +10,7 @@ from facadedevice.graph import triplet, Graph, context
 from facadedevice.utils import EnhancedDevice, aggregate_qualities
 
 # Object imports
-from facadedevice.objects import class_object, local_attribute
+from facadedevice.objects import class_object, local_attribute, NONE_STRING
 
 # Tango imports
 from tango.server import command
@@ -125,7 +125,7 @@ class Facade(_Facade):
             template = "Received an event from {0} that contains errors."
             msg = template.format(attr_name)
             if getattr(exc, "reason", None) in self.reasons_to_ignore:
-                self.ignore_exception(exc, msg=msg, origin=node)
+                self.ignore_exception(exc, msg=msg)
             else:
                 node.set_exception(exc)
             return
@@ -154,12 +154,18 @@ class Facade(_Facade):
 
     def run_proxy_command(self, factory, prop, value):
         """Used when writing a proxy attribute"""
-        subcommand = factory(getattr(self, prop))
-        subcommand(value)
+        return self.run_proxy_command_context(
+            factory, prop,
+            lambda subcommand, value: subcommand(value),
+            value)
 
     def run_proxy_command_context(self, factory, prop, ctx, *values):
         """Used when running a proxy command"""
-        print(self, factory, prop, ctx, values)
+        name = getattr(self, prop).strip().lower()
+        # Disabled command
+        if name == NONE_STRING:
+            raise ValueError('This proxy command is disabled')
+        # Run subcommand in context
         subcommand = factory(getattr(self, prop))
         return ctx(subcommand, *values)
 
@@ -207,8 +213,9 @@ class Facade(_Facade):
             value, stamp, quality = node.result()
             try:
                 state, status = value
-            except ValueError:
-                state, status = value, "The state is {}".format(value)
+            except TypeError:
+                state = value
+                status = "The device is in {} state.".format(value)
             self.set_state(state, stamp, quality)
             self.set_status(status, stamp, quality)
 
@@ -223,7 +230,7 @@ class Facade(_Facade):
         if node.exception() is not None:
             self.push_change_event(node.name, node.exception())
             self.push_archive_event(node.name, node.exception())
-        elif node.result is None:
+        elif node.result() is None:
             pass
         else:
             value, stamp, quality = node.result()

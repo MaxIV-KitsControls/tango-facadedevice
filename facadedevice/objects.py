@@ -28,10 +28,10 @@ class class_object(object):
         self.key = key
 
     def configure(self, device):
-        pass
+        pass  # pragma: no cover
 
     def connect(self, device):
-        pass
+        pass  # pragma: no cover
 
     # Representation
 
@@ -70,7 +70,7 @@ class node_object(class_object):
         if not method:
             raise ValueError('No update method defined')
         if not bind:
-            raise ValueError('Update method not bound')
+            raise ValueError('No binding defined')
         # Set the binding
         func = partial(
             device.aggregate_for_node,
@@ -230,12 +230,13 @@ class combined_attribute(proxy_attribute):
 
     def __init__(self, prop, **kwargs):
         super(combined_attribute, self).__init__(prop, **kwargs)
-        if self.use_default_write:
-            raise ValueError('A combined attribute cannot be writable')
 
     def update_class(self, key, dct):
         # Parent method
         super(combined_attribute, self).update_class(key, dct)
+        # Check write access
+        if self.use_default_write:
+            raise ValueError('{} cannot be writable'.format(self))
         # Override device property
         doc = "Attributes to be combined as {}.".format(key)
         dct[self.prop] = device_property(dtype=(str,), doc=doc)
@@ -248,7 +249,7 @@ class combined_attribute(proxy_attribute):
         attrs = list(filter(None, map(str.strip, map(str.lower, attrs))))
         # Empty property
         if not attrs:
-            raise ValueError('Property is empty')
+            raise ValueError('Property {!r} is empty'.format(self.prop))
         # Ignore attribute
         if len(attrs) == 1 and attrs[0] == NONE_STRING:
             return
@@ -328,16 +329,14 @@ class proxy_command(class_object):
         self.prop = prop
         self.attr = attr
         self.kwargs = kwargs
-        self.method = None
+        # Default method
+        self.method = lambda device, sub, *args: sub(*args)
 
     def __call__(self, method):
         self.method = method
         return self
 
     def update_class(self, key, dct):
-        # Check method
-        if not self.method:
-            raise ValueError('No method defined')
         # Set command
         factory = partial(make_subcommand, attr=self.attr)
         dct[key] = lambda device, *args: \
