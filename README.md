@@ -1,6 +1,8 @@
 tango-facadedevice
 ==================
-***
+
+[![Build Status](https://travis-ci.org/MaxIV-KitsControls/tango-facadedevice.svg?branch=master)](https://travis-ci.org/MaxIV-KitsControls/tango-facadedevice)
+[![Coverage Status](https://coveralls.io/repos/github/MaxIV-KitsControls/tango-facadedevice/badge.svg?branch=master)](https://coveralls.io/github/MaxIV-KitsControls/tango-facadedevice?branch=master)
 
 Provide reactive facade devices to subclass.
 
