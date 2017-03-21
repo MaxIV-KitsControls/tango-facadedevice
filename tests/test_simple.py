@@ -196,3 +196,22 @@ def test_manual_state(mocker):
         archive_events['State'].assert_called_with(*expected_state)
         change_events['Status'].assert_called_with(*expected_status)
         archive_events['Status'].assert_called_with(*expected_status)
+
+
+def test_exception_registration(mocker):
+
+    class Test(Facade):
+
+        @command
+        def oops(self):
+            try:
+                1/0
+            except Exception as exc:
+                exc.__traceback__ = None
+                self.ignore_exception(exc)
+
+    with DeviceTestContext(Test) as proxy:
+        assert proxy.state() == DevState.UNKNOWN
+        proxy.oops()
+        info = proxy.getinfo()
+        assert "by zero" in info

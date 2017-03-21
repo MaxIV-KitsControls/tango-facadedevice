@@ -274,22 +274,34 @@ def test_proxy_attribute_with_wrong_events(mocker):
         # Ignore event
         event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
-        exception = DevFailed('Ooops')
+        exception = RuntimeError('Ooops')
         exception.reason = 'API_PollThreadOutOfSync'
         event.errors = [exception, RuntimeError()]
         cb(event)
         assert proxy.state() == DevState.UNKNOWN
         change_events['attr'].assert_not_called()
         archive_events['attr'].assert_not_called()
+        # Check info
+        info = proxy.getinfo()
+        assert "Received an event from a/b/c/d that contains errors" in info
+        assert "Ooops" in info
         # Error event
         event = mocker.Mock(spec=EventData)
         event.attr_name = 'a/b/c/d'
-        exception = DevFailed('Ooops')
+        exception = RuntimeError('Ooops')
+        exception.reason = 'ValidReason'
         event.errors = [exception, RuntimeError()]
         cb(event)
         assert proxy.state() == DevState.UNKNOWN
-        change_events['attr'].assert_called_with(exception)
-        archive_events['attr'].assert_called_with(exception)
+        for dct in (change_events, archive_events):
+            lst = dct['attr'].call_args_list
+            assert len(lst) == 1
+            exc, = lst[0][0]
+            assert isinstance(exc, DevFailed)
+            assert 'Ooops' in exc.args[0].desc
+        # Check info
+        info = proxy.getinfo()
+        assert "Raised 2 times" in info
 
 
 def test_disabled_proxy_attribute(mocker):

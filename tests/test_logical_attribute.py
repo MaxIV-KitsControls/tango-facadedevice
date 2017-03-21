@@ -164,12 +164,13 @@ def test_logical_attribute_with_exception(mocker):
         with pytest.raises(DevFailed):
             proxy.C
         # Check events
-        change_events['B'].assert_called_once_with(exception)
-        archive_events['B'].assert_called_once_with(exception)
-        ctx, = change_events['C'].call_args[0]
-        assert ctx.base == exception
-        ctx, = archive_events['C'].call_args[0]
-        assert ctx.base == exception
+        for dct in (change_events, archive_events):
+            for attr in ('B', 'C'):
+                lst = dct[attr].call_args_list
+                assert len(lst) == 1
+                exc, = lst[0][0]
+                assert isinstance(exc, DevFailed)
+                assert 'Ooops' in exc.args[0].desc
 
 
 def test_logical_attribute_missing_method(mocker):
