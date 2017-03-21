@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
 
 # Tango imports
 from tango.server import Device, command
-from tango import AutoTangoMonitor, Database, DeviceProxy
+from tango import AutoTangoMonitor, Database, DeviceProxy, Except
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, DispLevel
 
 
@@ -28,10 +28,36 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 
 # Safer traceback
 
-def safe_traceback(limit=None):
-    if not any(sys.exc_info()):
-        return "No traceback."
-    return traceback.format_exc(limit=limit).replace("%", "%%")
+def traceback_string(exc, limit=None):
+    if getattr(exc, '__traceback__', None):
+        return ''.join(traceback.format_tb(exc.__traceback__, limit=limit))
+    if any(sys.exc_info()):
+        return traceback.format_exc(limit=limit)
+    return "No traceback."
+
+
+# Safe exception representation
+
+def exception_string(exc):
+    # Convert DevFailed
+    if isinstance(exc, DevFailed) and exc.args:
+        exc = exc.args[0]
+    # Exception as a string
+    try:
+        return exc.desc
+    except AttributeError:
+        return str(exc) if str(exc) else repr(exc)
+
+
+# DevFailed conversion
+
+def to_dev_failed(exc):
+    tb = traceback_string(exc)
+    desc = exception_string(exc)
+    try:
+        Except.throw_exception('PyDs_PythonError', desc, tb)
+    except Exception as exc:
+        return exc
 
 
 # Aggregate qualities
@@ -122,30 +148,22 @@ class EnhancedDevice(Device):
 
     def register_exception(self, exc, msg="", ignore=False):
         # Stream traceback
-        if getattr(exc, 'traceback', None):
-            self.debug_stream(exc.traceback)
-        else:
-            self.debug_stream(safe_traceback())
-        # Convert DevFailed
-        if isinstance(exc, DevFailed) and exc.args:
-            exc = exc.args[0]
+        self.debug_stream(traceback_string(exc).replace("%", "%%"))
         # Exception as a string
-        try:
-            exc = exc.desc
-        except AttributeError:
-            exc = str(exc) if str(exc) else repr(exc)
-        # Format status
-        status = '\n'.join(filter(None, [msg, exc]))
+        status = exception_string(exc)
+        # Add message
+        if msg:
+            base = status.splitlines()
+            indented = '\n'.join('  ' + line for line in base)
+            status = "{}:\n{}".format(msg, indented)
         # Stream error
         self.error_stream(status)
         # Save in history
         self._exception_history[status] += 1
-        # Ignore exception
-        if ignore:
-            return status
         # Set state and status
-        self.set_status(status)
-        self.set_state(DevState.FAULT)
+        if not ignore:
+            self.set_status(status)
+            self.set_state(DevState.FAULT)
         # Return exception status
         return status
 

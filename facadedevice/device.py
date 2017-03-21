@@ -8,6 +8,7 @@ from facadedevice.graph import triplet, Graph, context
 
 # Common imports
 from facadedevice.utils import EnhancedDevice, aggregate_qualities
+from facadedevice.utils import to_dev_failed
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute, NONE_STRING
@@ -117,19 +118,18 @@ class Facade(_Facade):
         """Handle node events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
-            msg = "Received an unexpected event."
-            self.ignore_exception(event, msg=msg)
+            msg = "Received an unexpected event for {}"
+            self.error_stream(msg.format(node))
             return
         # Format attribute name
         attr_name = '/'.join(event.attr_name.split('/')[-4:])
         # Ignore the event if it contains an error
         if event.errors:
-            exc = event.errors[0]
-            template = "Received an event from {} that contains errors."
-            msg = template.format(attr_name)
-            if getattr(exc, "reason", None) in self.reasons_to_ignore:
-                self.ignore_exception(exc, msg=msg)
-            else:
+            exc = DevFailed(*event.errors)
+            reason = exc.args[0].reason
+            msg = "Received an event from {} that contains errors"
+            self.ignore_exception(exc, msg=msg.format(attr_name))
+            if reason not in self.reasons_to_ignore:
                 node.set_exception(exc)
             return
         # Info stream
@@ -231,8 +231,10 @@ class Facade(_Facade):
             attr.set_change_event(True, False)
         # Exception
         if node.exception() is not None:
-            self.push_change_event(node.name, node.exception())
-            self.push_archive_event(node.name, node.exception())
+            exception = to_dev_failed(node.exception())
+            print(exception)
+            self.push_change_event(node.name, exception)
+            self.push_archive_event(node.name, exception)
         elif node.result() is None:
             pass
         else:

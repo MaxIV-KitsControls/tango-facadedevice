@@ -1,14 +1,14 @@
 
 
+import sys
 import warnings
-import traceback
+
+from functools import partial
+from contextlib import contextmanager
+from collections import Mapping, namedtuple, defaultdict
 
 from numpy import array_equal
 from tango import AttrQuality
-
-from functools import partial
-from collections import Mapping, namedtuple, defaultdict
-from contextlib import contextmanager
 
 # Constants
 
@@ -55,11 +55,11 @@ triplet.from_attr_value = classmethod(from_attr_value)
 
 class ContextException(Exception):
 
-    def __init__(self, base, context, origin, tb=None):
+    def __init__(self, base, context, origin, traceback):
         self.base = base
         self.context = context
         self.origin = origin
-        self.traceback = tb
+        self.__traceback__ = traceback
 
     @property
     def desc(self):
@@ -77,8 +77,9 @@ def context(msg, origin):
     try:
         yield
     except Exception as exc:
+        _, _, tb = sys.exc_info()
         raise ContextException(
-            exc, msg, origin, traceback.format_exc())
+            exc, msg, origin, tb)
 
 
 # Node object
