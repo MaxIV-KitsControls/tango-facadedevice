@@ -9,6 +9,12 @@ import functools
 import traceback
 import collections
 
+# Conditional imports
+try:
+    from threading import get_ident
+except ImportError:  # pragma: no cover
+    from threading import _get_ident as get_ident
+
 # Tango imports
 from tango.server import Device, command
 from tango import AutoTangoMonitor, Database, DeviceProxy
@@ -160,6 +166,7 @@ class EnhancedDevice(Device):
         self._event_dict = {}
         self._connected = False
         self._tango_properties = {}
+        self._init_ident = get_ident()
         self._init_stamp = time.time()
         self._eid_counter = itertools.count(1)
         self._exception_history = collections.defaultdict(int)
@@ -200,6 +207,11 @@ class EnhancedDevice(Device):
 
     def _wrap_callback(self, callback, eid):
         def wrapped(event):
+            # Fix libtango bug #316
+            if self.get_state() == DevState.INIT and \
+               self._init_ident != get_ident():
+                return  # pragma: no cover
+            # Acquire monitor lock
             with AutoTangoMonitor(self):
                 if eid in self._event_dict:
                     callback(event)
