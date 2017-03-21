@@ -11,7 +11,7 @@ import collections
 
 # Tango imports
 from tango.server import Device, command
-from tango import AutoTangoMonitor, Database, DeviceProxy, LatestDeviceImpl
+from tango import AutoTangoMonitor, Database, DeviceProxy
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, DispLevel
 
 
