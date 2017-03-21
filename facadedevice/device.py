@@ -66,9 +66,12 @@ class Facade(_Facade):
 
     # Initialization
 
-    def init_device(self):
+    def safe_init_device(self):
         """Initialize the device."""
         self._graph = Graph()
+        # Get properties
+        with context('getting', 'properties'):
+            super(Facade, self).safe_init_device()
         # Configure
         for value in self._class_dict.values():
             with context('configuring', value):
@@ -122,7 +125,7 @@ class Facade(_Facade):
         # Ignore the event if it contains an error
         if event.errors:
             exc = event.errors[0]
-            template = "Received an event from {0} that contains errors."
+            template = "Received an event from {} that contains errors."
             msg = template.format(attr_name)
             if getattr(exc, "reason", None) in self.reasons_to_ignore:
                 self.ignore_exception(exc, msg=msg)
@@ -130,7 +133,7 @@ class Facade(_Facade):
                 node.set_exception(exc)
             return
         # Info stream
-        msg = "Received a valid event from {0} for {1}."
+        msg = "Received a valid event from {} for {}."
         self.info_stream(msg.format(attr_name, node))
         # Save
         value = triplet.from_attr_value(event.attr_value)
@@ -171,7 +174,7 @@ class Facade(_Facade):
 
     # Controlled callbacks
 
-    def safe_callback(self, ctx, func, node):
+    def run_callback(self, ctx, func, node):
         """Contexualize different node callbacks."""
         try:
             with context(ctx, node):

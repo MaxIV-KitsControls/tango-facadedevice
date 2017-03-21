@@ -1,6 +1,7 @@
 """Provide helpers for tango."""
 
 # Imports
+import sys
 import time
 import fnmatch
 import itertools
@@ -22,10 +23,9 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 # Safer traceback
 
 def safe_traceback(limit=None):
-    try:
-        return traceback.format_exc(limit=limit).replace("%", "%%")
-    except:
-        return ''  # pragma: no cover
+    if not any(sys.exc_info()):
+        return "No traceback."
+    return traceback.format_exc(limit=limit).replace("%", "%%")
 
 
 # Aggregate qualities
@@ -155,7 +155,7 @@ class EnhancedDevice(Device):
             if value[2] is None:
                 raise ValueError('Missing property: ' + key)
 
-    def __init__(self, cl, name):
+    def init_device(self):
         # Init attributes
         self._event_dict = {}
         self._connected = False
@@ -163,8 +163,6 @@ class EnhancedDevice(Device):
         self._init_stamp = time.time()
         self._eid_counter = itertools.count(1)
         self._exception_history = collections.defaultdict(int)
-        # Skip Device.__init__ parent call
-        LatestDeviceImpl.__init__(self, cl, name)
         # Init state and status events
         self.set_change_event('State', True, False)
         self.set_archive_event('State', True, True)
@@ -172,16 +170,9 @@ class EnhancedDevice(Device):
         self.set_archive_event('Status', True, True)
         # Set INIT state
         self.set_state(DevState.INIT)
-        # Get device properties
-        try:
-            self.get_device_properties()
-        except Exception as exc:
-            msg = "Error while getting device properties"
-            self.register_exception(exc, msg)
-            return
         # Initialize the device
         try:
-            self.init_device()
+            self.safe_init_device()
         except Exception as exc:
             msg = "Exception while initializing the device"
             self.register_exception(exc, msg)
@@ -192,8 +183,8 @@ class EnhancedDevice(Device):
         if self.get_state() == DevState.INIT:
             self.set_state(DevState.UNKNOWN)
 
-    def init_device(self):
-        pass
+    def safe_init_device(self):
+        self.get_device_properties()
 
     def delete_device(self):
         # Unsubscribe all
@@ -247,11 +238,11 @@ class EnhancedDevice(Device):
             try:
                 self.unsubscribe_event(eid)
             except Exception as exc:
-                msg = "Cannot unsubscribe from attribute {0}"
+                msg = "Cannot unsubscribe from attribute {}"
                 msg = msg.format(attr_name)
                 self.ignore_exception(exc, msg)
             else:
-                msg = "Successfully Unsubscribed from attribute {0}"
+                msg = "Successfully Unsubscribed from attribute {}"
                 msg = msg.format(attr_name)
                 self.info_stream(msg)
 

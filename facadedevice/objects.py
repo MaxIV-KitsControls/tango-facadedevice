@@ -59,7 +59,7 @@ class node_object(class_object):
             return
         # Add user callback
         node.callbacks.append(partial(
-            device.safe_callback,
+            device.run_callback,
             "running user callback for",
             self.callback.__get__(device)))
 
@@ -129,7 +129,7 @@ class local_attribute(node_object):
         node = device.graph[self.key]
         # Add push event callback
         node.callbacks.append(partial(
-            device.safe_callback,
+            device.run_callback,
             "pushing events for",
             device.push_event_for_node))
 
@@ -297,7 +297,7 @@ class state_attribute(node_object):
         node = device.graph[self.key]
         # Add set state callback
         node.callbacks.append(partial(
-            device.safe_callback,
+            device.run_callback,
             "setting the state from",
             device.set_state_from_node))
         # Nothing to bind
