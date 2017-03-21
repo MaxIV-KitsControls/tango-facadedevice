@@ -4,6 +4,7 @@
 import pytest
 
 # Tango imports
+from tango.server import command
 from tango.test_context import DeviceTestContext
 from tango import DevState, EventType, EventData, AttrQuality
 from tango import AttrWriteType, DevFailed
@@ -56,6 +57,12 @@ def test_proxy_attribute(mocker):
         expected = 1.2, 3.4, AttrQuality.ATTR_ALARM
         change_events['attr'].assert_called_with(*expected)
         archive_events['attr'].assert_called_with(*expected)
+        # Check info
+        info = proxy.getinfo()
+        assert "- a/b/c/d (CHANGE_EVENT)" in info
+        # Check delete + init device
+        proxy.init()
+        assert proxy.state() == DevState.UNKNOWN
 
 
 def test_proxy_attribute_with_convertion(mocker):
@@ -329,3 +336,77 @@ def test_non_writable_proxy_attribute(mocker):
     with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
         assert proxy.state() == DevState.FAULT
         assert "The attribute a/b/c/d is not writable" in proxy.status()
+
+
+def test_missing_property():
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            prop='prop',
+            access=AttrWriteType.READ_WRITE)
+
+    with DeviceTestContext(Test) as proxy:
+        assert proxy.state() == DevState.FAULT
+        assert "Missing property: prop" in proxy.status()
+        assert "The device is currently stopped" in proxy.getinfo()
+        assert "Missing property: prop" in proxy.getinfo()
+
+
+def test_proxy_attribute_broken_internals(mocker):
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            prop='prop')
+
+        @command
+        def break_device(self):
+            del self._event_dict
+
+    change_events, archive_events = event_mock(mocker, Test)
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+    inner_proxy = utils.DeviceProxy.return_value
+    inner_proxy.dev_name.return_value = 'a/b/c'
+
+    with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Break internal state
+        proxy.break_device()
+        # Run delete device
+        proxy.init()
+        # State is OK
+        assert proxy.state() == DevState.UNKNOWN
+
+
+def test_proxy_attribute_broken_unsubscription(mocker):
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            prop='prop')
+
+        @command
+        def delete(self):
+            self.delete_device()
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+    inner_proxy = utils.DeviceProxy.return_value
+    inner_proxy.dev_name.return_value = 'a/b/c'
+
+    inner_proxy.unsubscribe_event.side_effect = RuntimeError("Ooops")
+
+    with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Run delete device
+        proxy.delete()
+        # Check info
+        info = proxy.getinfo()
+        assert "Cannot unsubscribe from attribute a/b/c/d" in info
+        assert "Ooops" in info

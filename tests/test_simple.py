@@ -145,28 +145,26 @@ def test_empty_state(mocker):
 def test_delete_device():
 
     class Test(Facade):
-
-        def init_device(self):
-            super(Test, self).init_device()
-            self.delete_device()
-            self.set_state(DevState.ON)
+        pass
 
     with DeviceTestContext(Test) as proxy:
-        assert proxy.state() == DevState.ON
+        assert proxy.state() == DevState.UNKNOWN
+        proxy.init()
+        assert proxy.state() == DevState.UNKNOWN
 
 
 def test_delete_device_fail():
 
     class Test(Facade):
 
-        def init_device(self):
-            super(Test, self).init_device()
+        @command
+        def break_device(self):
             self._graph = None
             self.delete_device()
-            self.set_state(DevState.ON)
 
     with DeviceTestContext(Test) as proxy:
-        assert proxy.state() == DevState.ON
+        assert proxy.state() == DevState.UNKNOWN
+        proxy.break_device()
         info = proxy.getinfo()
         assert 'Error while resetting the graph' in info
 
