@@ -167,22 +167,26 @@ class proxy_attribute(logical_attribute):
     """Tango attribute linked to the attribute of a remote device.
 
     Args:
-        prop (str):
+        property_name (str):
             Name of the property containing the attribute name.
+        create_property (str):
+            Create the corresponding device property. Default is True.
 
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, prop, **kwargs):
-        self.prop = prop
+    def __init__(self, property_name, create_property=True, **kwargs):
+        self.property_name = property_name
+        self.create_property = create_property
         super(proxy_attribute, self).__init__(None, **kwargs)
 
     def update_class(self, key, dct):
         # Parent method
         super(proxy_attribute, self).update_class(key, dct)
         # Create device property
-        doc = "Attribute to be forwarded as {}.".format(key)
-        dct[self.prop] = device_property(dtype=str, doc=doc)
+        if self.create_property:
+            doc = "Attribute to be forwarded as {}.".format(key)
+            dct[self.property_name] = device_property(dtype=str, doc=doc)
         # Read-only or custom write
         if not self.use_default_write:
             return
@@ -191,11 +195,11 @@ class proxy_attribute(logical_attribute):
         dct[key] = dct[key].setter(
             lambda device, value:
                 device.run_proxy_command(
-                    factory, self.prop, value))
+                    factory, self.property_name, value))
 
     def configure_binding(self, device, node):
         # Get properties
-        attr = getattr(device, self.prop).strip().lower()
+        attr = getattr(device, self.property_name).strip().lower()
         # Ignore attribute
         if attr == NONE_STRING:
             node.subnodes = []
@@ -227,9 +231,20 @@ class proxy_attribute(logical_attribute):
 # Combined attribute
 
 class combined_attribute(proxy_attribute):
+    """Tango attribute computed from the values of other remote attributes.
 
-    def __init__(self, prop, **kwargs):
-        super(combined_attribute, self).__init__(prop, **kwargs)
+    Use it as a decorator to register the function that make this computation.
+    The remote attribute names are provided by a property, either as a list or
+    a pattern.
+
+    Args:
+        property_name (str):
+            Name of the property containing the attribute names.
+        create_property (str):
+            Create the corresponding device property. Default is True.
+
+    Also supports the standard attribute keywords.
+    """
 
     def update_class(self, key, dct):
         # Parent method
@@ -238,18 +253,20 @@ class combined_attribute(proxy_attribute):
         if self.use_default_write:
             raise ValueError('{} cannot be writable'.format(self))
         # Override device property
-        doc = "Attributes to be combined as {}.".format(key)
-        dct[self.prop] = device_property(dtype=(str,), doc=doc)
+        if self.create_property:
+            doc = "Attributes to be combined as {}.".format(key)
+            dct[self.property_name] = device_property(dtype=(str,), doc=doc)
 
     def configure_binding(self, device, node):
         # Init subnodes
         node.subnodes = []
         # Strip property
-        attrs = getattr(device, self.prop)
+        attrs = getattr(device, self.property_name)
         attrs = list(filter(None, map(str.strip, map(str.lower, attrs))))
         # Empty property
         if not attrs:
-            raise ValueError('Property {!r} is empty'.format(self.prop))
+            msg = 'Property {!r} is empty'
+            raise ValueError(msg.format(self.property_name))
         # Ignore attribute
         if len(attrs) == 1 and attrs[0] == NONE_STRING:
             return
@@ -312,23 +329,27 @@ class state_attribute(node_object):
 class proxy_command(class_object):
     """Command to write an attribute or run a command of a remote device.
 
-    It is meant to be used as a decorator
+    It can be used as a decorator to define a more precise behavior.
+    The decorated method takes the subcommand as its firt argument.
 
     Args:
-        prop (str):
+        property_name (str):
             Name of the property containing the attribute or command name.
-            None to not use a property (None by default)
-        attr (bool):
+        create_property (str):
+            Create the corresponding device property. Default is True.
+        write_attribute (bool):
             True if the subcommand should an attribute write, False otherwise.
             Default is false.
 
     Also supports the standard command keywords.
     """
 
-    def __init__(self, prop, attr=False, **kwargs):
-        self.prop = prop
-        self.attr = attr
+    def __init__(self, property_name, create_property=True,
+                 write_attribute=False, **kwargs):
         self.kwargs = kwargs
+        self.property_name = property_name
+        self.create_property = create_property
+        self.write_attribute = write_attribute
         # Default method
         self.method = lambda device, sub, *args: sub(*args)
 
@@ -338,10 +359,11 @@ class proxy_command(class_object):
 
     def update_class(self, key, dct):
         # Set command
-        factory = partial(make_subcommand, attr=self.attr)
+        factory = partial(make_subcommand, attr=self.write_attribute)
         dct[key] = lambda device, *args: \
             device.run_proxy_command_context(
-                 factory, self.prop, self.method.__get__(device), *args)
+                factory, self.property_name,
+                self.method.__get__(device), *args)
         dct[key].__name__ = key
         dct[key] = command(**self.kwargs)(dct[key])
         # Set is allowed method
@@ -349,13 +371,18 @@ class proxy_command(class_object):
         if method_name not in dct:
             dct[method_name] = lambda device: device.connected
             dct[method_name].__name__ = method_name
-        # Create properties
-        dct[self.prop] = device_property(dtype=str)
+        # Create property
+        if self.create_property:
+            doc = ("Attribute to be written"
+                   if self.write_attribute else
+                   "Subcommand to be executed")
+            doc += " in {} command.".format(key)
+            dct[self.property_name] = device_property(dtype=str, doc=doc)
 
     def configure(self, device):
-        name = getattr(device, self.prop).strip().lower()
+        name = getattr(device, self.property_name).strip().lower()
         # Disabled command
         if name == NONE_STRING:
             return
         # Check subcommand
-        make_subcommand(name, attr=self.attr)
+        make_subcommand(name, attr=self.write_attribute)
