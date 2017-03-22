@@ -22,7 +22,7 @@ def test_proxy_attribute(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
     change_events, archive_events = event_mock(mocker, Test)
 
@@ -71,7 +71,7 @@ def test_proxy_attribute_with_convertion(mocker):
 
         @proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
         def attr(self, raw):
             return raw*10
 
@@ -116,7 +116,7 @@ def test_writable_proxy_attribute(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop',
+            property_name='prop',
             access=AttrWriteType.READ_WRITE)
 
     change_events, archive_events = event_mock(mocker, Test)
@@ -165,7 +165,7 @@ def test_proxy_attribute_with_periodic_event(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
     def sub(attr, etype, *args):
         if etype != EventType.PERIODIC_EVENT:
@@ -213,7 +213,7 @@ def test_proxy_attribute_not_evented(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
     change_events, archive_events = event_mock(mocker, Test)
 
@@ -245,7 +245,7 @@ def test_proxy_attribute_with_wrong_events(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
     change_events, archive_events = event_mock(mocker, Test)
 
@@ -310,7 +310,7 @@ def test_disabled_proxy_attribute(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop',
+            property_name='prop',
             access=AttrWriteType.READ_WRITE)
 
     change_events, archive_events = event_mock(mocker, Test)
@@ -334,7 +334,7 @@ def test_non_writable_proxy_attribute(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop',
+            property_name='prop',
             access=AttrWriteType.READ_WRITE)
 
     change_events, archive_events = event_mock(mocker, Test)
@@ -356,7 +356,7 @@ def test_missing_property():
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop',
+            property_name='prop',
             access=AttrWriteType.READ_WRITE)
 
     with DeviceTestContext(Test) as proxy:
@@ -372,7 +372,7 @@ def test_proxy_attribute_broken_internals(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
         @command
         def break_device(self):
@@ -401,7 +401,7 @@ def test_proxy_attribute_broken_unsubscription(mocker):
 
         attr = proxy_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
 
         @command
         def delete(self):

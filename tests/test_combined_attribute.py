@@ -22,7 +22,7 @@ def test_combined_attribute(mocker):
 
         @combined_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
         def attr(self, *values):
             return sum(values)
 
@@ -96,7 +96,7 @@ def test_writable_combined_attribute(mocker):
 
             @combined_attribute(
                 dtype=float,
-                prop='prop',
+                property_name='prop',
                 access=AttrWriteType.READ_WRITE)
             def attr(self, *values):
                 return sum(values)
@@ -111,7 +111,7 @@ def test_combined_attribute_empty_prop(mocker):
 
         @combined_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
         def attr(self, *values):
             return sum(values)
 
@@ -128,7 +128,7 @@ def test_disabled_combined_attribute(mocker):
 
         @combined_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
         def attr(self, *values):
             return sum(values)
 
@@ -150,7 +150,7 @@ def test_combined_attribute_with_wildcard(mocker):
 
         @combined_attribute(
             dtype=float,
-            prop='prop')
+            property_name='prop')
         def attr(self, *values):
             return sum(values)
 

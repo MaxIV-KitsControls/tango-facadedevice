@@ -16,7 +16,7 @@ def test_simple_proxy_command(mocker):
     class Test(Facade):
 
         double = proxy_command(
-            prop='prop',
+            property_name='prop',
             dtype_in=int,
             dtype_out=int)
 
@@ -41,7 +41,7 @@ def test_complex_proxy_command(mocker):
     class Test(Facade):
 
         @proxy_command(
-            prop='prop',
+            property_name='prop',
             dtype_in=int)
         def cmd(self, subcommand, n):
             for _ in range(n):
@@ -68,7 +68,7 @@ def test_no_proxy_command(mocker):
     class Test(Facade):
 
         double = proxy_command(
-            prop='prop',
+            property_name='prop',
             dtype_in=int,
             dtype_out=int)
 
