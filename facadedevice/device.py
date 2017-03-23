@@ -4,11 +4,11 @@
 import time
 
 # Base imports
-from facadedevice.graph import triplet, Graph, context
+from facadedevice.graph import triplet, Graph, context, INVALID
 
 # Common imports
 from facadedevice.utils import EnhancedDevice, aggregate_qualities
-from facadedevice.utils import to_dev_failed
+from facadedevice.utils import to_dev_failed, get_default_attribute_value
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute, NONE_STRING
@@ -64,6 +64,17 @@ class Facade(_Facade):
     @property
     def graph(self):
         return self._graph
+
+    # Helper
+
+    def normalize_attribute_value(self, attr, value, stamp, quality):
+        if value is None:
+            quality = INVALID
+        if quality == INVALID:
+            dtype = attr.get_data_type()
+            dformat = attr.get_data_format()
+            value = get_default_attribute_value(dformat, dtype)
+        return value, stamp, quality
 
     # Initialization
 
@@ -147,7 +158,9 @@ class Facade(_Facade):
             return
         value, stamp, quality = node.result()
         if attr:
-            attr.set_value_date_quality(value, stamp, quality)
+            attr.set_value_date_quality(
+                *self.normalize_attribute_value(
+                    attr, value, stamp, quality))
         return value, stamp, quality
 
     def write_to_node(self, node, value):
@@ -195,14 +208,20 @@ class Facade(_Facade):
                 return
             # Exctract values
             values, stamps, qualities = zip(*results)
+            # Invalid quality
+            if any(quality == INVALID for quality in qualities):
+                return triplet(None, max(stamps), INVALID)
+            # Run function
             result = func(*values)
             # Return triplet
             if isinstance(result, triplet):
                 return result
             # Create triplet
-            stamp = max(stamps)
-            quality = aggregate_qualities(qualities)
-            return triplet(result, stamp, quality)
+            if result is None:
+                quality = INVALID
+            else:
+                quality = aggregate_qualities(qualities)
+            return triplet(result, max(stamps), quality)
 
     # Dedicated callbacks
 
@@ -215,7 +234,12 @@ class Facade(_Facade):
         else:
             value, stamp, quality = node.result()
             try:
-                state, status = value
+                if value is None or quality == INVALID:
+                    state = DevState.FAULT
+                    status = "The state cannot be computed."
+                    status += " Some values are invalid."
+                else:
+                    state, status = value
             except TypeError:
                 state = value
                 status = "The device is in {} state.".format(value)
@@ -232,13 +256,13 @@ class Facade(_Facade):
         # Exception
         if node.exception() is not None:
             exception = to_dev_failed(node.exception())
-            print(exception)
             self.push_change_event(node.name, exception)
             self.push_archive_event(node.name, exception)
         elif node.result() is None:
             pass
         else:
-            value, stamp, quality = node.result()
+            value, stamp, quality = self.normalize_attribute_value(
+                attr, *node.result())
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
 
@@ -264,6 +288,10 @@ class TimedFacade(Facade):
         self.UpdateTime()
 
     Time = local_attribute(dtype=float)
+
+    @Time.notify
+    def on_time(self, node):
+        pass
 
     @command(
         polling_period=1000,

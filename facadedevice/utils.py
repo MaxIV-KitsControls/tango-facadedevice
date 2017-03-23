@@ -19,6 +19,7 @@ except ImportError:  # pragma: no cover
 from tango.server import Device, command
 from tango import AutoTangoMonitor, Database, DeviceProxy, Except
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, DispLevel
+from tango import AttrDataFormat, CmdArgType
 
 
 # Constants
@@ -60,8 +61,20 @@ def to_dev_failed(exc):
         return exc
 
 
-# Aggregate qualities
+# Default attribute value
 
+def get_default_attribute_value(dformat, dtype):
+    if dformat == AttrDataFormat.IMAGE:
+        return ((),)
+    if dformat == AttrDataFormat.SPECTRUM:
+        return ()
+    if dtype == CmdArgType.DevString:
+        return ""
+    # Zero should work for everything else
+    return 0
+
+
+# Aggregate qualities
 
 def aggregate_qualities(qualities):
     length = len(AttrQuality.values)
