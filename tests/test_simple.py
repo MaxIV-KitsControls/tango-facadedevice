@@ -9,7 +9,7 @@ from tango import DevState, AttrWriteType
 from tango.test_context import DeviceTestContext
 
 # Proxy imports
-from facadedevice.graph import VALID, triplet
+from facadedevice.graph import VALID, INVALID, triplet
 from facadedevice import Facade, TimedFacade, state_attribute
 from facadedevice import local_attribute
 
@@ -215,3 +215,29 @@ def test_exception_registration(mocker):
         proxy.oops()
         info = proxy.getinfo()
         assert "by zero" in info
+
+
+def test_simple_device_invalid_state(mocker):
+
+    class Test(TimedFacade):
+
+        @state_attribute(bind=['Time'])
+        def State(self, time):
+            return None
+
+    time.time
+    mocker.patch('time.time').return_value = 1.0
+    change_events, archive_events = event_mock(mocker, Test)
+    expected = "The state cannot be computed. Some values are invalid."
+
+    with DeviceTestContext(Test, debug=3) as proxy:
+        assert proxy.state() == DevState.FAULT
+        assert proxy.status() == expected
+        assert proxy.read_attribute("State").value == DevState.FAULT
+        assert proxy.read_attribute("State").quality == VALID
+        expected_state = DevState.FAULT, 1.0, INVALID
+        expected_status = expected, 1.0, INVALID
+        change_events['State'].assert_called_with(*expected_state)
+        archive_events['State'].assert_called_with(*expected_state)
+        change_events['Status'].assert_called_with(*expected_status)
+        archive_events['Status'].assert_called_with(*expected_status)

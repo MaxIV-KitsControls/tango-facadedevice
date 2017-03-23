@@ -10,8 +10,7 @@ from tango import AttrQuality, DevState
 from tango import AttrWriteType, DevFailed
 
 # Proxy imports
-from facadedevice import Facade
-from facadedevice import triplet
+from facadedevice import Facade, triplet
 from facadedevice import local_attribute, logical_attribute
 
 # Local imports
@@ -215,3 +214,109 @@ def test_logical_attribute_missing_binding(mocker):
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.FAULT
         assert "No binding defined" in proxy.status()
+
+
+def test_logical_attribute_with_invalid_values(mocker):
+
+    class Test(Facade):
+
+        A = local_attribute(
+            dtype=float,
+            access=AttrWriteType.READ_WRITE)
+
+        @logical_attribute(
+            dtype=float,
+            bind=['A'])
+        def B(self, a):
+            return a+1
+
+        @logical_attribute(
+            dtype=(float,),
+            max_dim_x=10,
+            bind=['A'])
+        def C(self, a):
+            return [a+1]
+
+        @logical_attribute(
+            dtype=((float,),),
+            max_dim_x=10,
+            max_dim_y=10,
+            bind=['A'])
+        def D(self, a):
+            return [[a+1]]
+
+        @logical_attribute(
+            dtype=str,
+            bind=['A'])
+        def E(self, a):
+            return str(a+1)
+
+        @command
+        def setinvalid(self):
+            result = triplet(0, 1.2, AttrQuality.ATTR_INVALID)
+            self.graph['A'].set_result(result)
+
+    time.time
+    change_events, archive_events = event_mock(mocker, Test)
+    mocker.patch('time.time').return_value = 1.0
+
+    with DeviceTestContext(Test) as proxy:
+        # Test 1
+        with pytest.raises(DevFailed):
+            proxy.A
+        with pytest.raises(DevFailed):
+            proxy.B
+        # Test 2
+        proxy.A = 2
+        assert proxy.A == 2
+        assert proxy.B == 3
+        assert proxy.C == [3]
+        assert proxy.D == [[3]]
+        assert proxy.E == "3.0"
+        # Test 3
+        proxy.setinvalid()
+        expected = 0, 1.2, AttrQuality.ATTR_INVALID
+        change_events['B'].assert_called_with(*expected)
+        archive_events['B'].assert_called_with(*expected)
+        expected = (), 1.2, AttrQuality.ATTR_INVALID
+        change_events['C'].assert_called_with(*expected)
+        archive_events['C'].assert_called_with(*expected)
+        expected = ((),), 1.2, AttrQuality.ATTR_INVALID
+        change_events['D'].assert_called_with(*expected)
+        archive_events['D'].assert_called_with(*expected)
+        expected = "", 1.2, AttrQuality.ATTR_INVALID
+        change_events['E'].assert_called_with(*expected)
+        archive_events['E'].assert_called_with(*expected)
+
+
+def test_logical_attribute_returning_none(mocker):
+
+    class Test(Facade):
+
+        @logical_attribute(
+            dtype=float,
+            bind=['A'])
+        def B(self, a):
+            return None
+
+        A = local_attribute(
+            dtype=float,
+            access=AttrWriteType.READ_WRITE)
+
+    time.time
+    change_events, archive_events = event_mock(mocker, Test)
+    mocker.patch('time.time').return_value = 1.0
+
+    with DeviceTestContext(Test) as proxy:
+        # Test 1
+        with pytest.raises(DevFailed):
+            proxy.A
+        with pytest.raises(DevFailed):
+            proxy.B
+        # Test 2
+        proxy.A = 2
+        assert proxy.A == 2
+        assert proxy.B is None
+        expected = 0, 1.0, AttrQuality.ATTR_INVALID
+        change_events['B'].assert_called_with(*expected)
+        archive_events['B'].assert_called_with(*expected)
