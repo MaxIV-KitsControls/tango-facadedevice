@@ -214,6 +214,7 @@ class EnhancedDevice(Device):
         except Exception as exc:
             msg = "Exception while initializing the device"
             self.register_exception(exc, msg)
+            self.delete_device()
             return
         else:
             self._connected = True
@@ -327,7 +328,7 @@ class EnhancedDevice(Device):
                 attr_name = '/'.join((proxy.dev_name(), attr_name))
                 lines.append("- {} ({})".format(attr_name, event_type))
         else:
-            lines.append("It didn't subscribe to any event.")
+            lines.append("It doesn't hold a subsription to any event channel.")
         # Exception history
         lines.append("-" * 5)
         strtime = time.ctime(self._init_stamp)
