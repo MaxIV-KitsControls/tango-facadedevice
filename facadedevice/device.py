@@ -248,21 +248,18 @@ class Facade(_Facade):
 
     def push_event_for_node(self, node):
         attr = getattr(self, node.name)
-        # Set events
-        if not attr.is_archive_event():
-            attr.set_archive_event(True, True)
-        if not attr.is_change_event():
-            attr.set_change_event(True, False)
         # Exception
         if node.exception() is not None:
             exception = to_dev_failed(node.exception())
             self.push_change_event(node.name, exception)
             self.push_archive_event(node.name, exception)
+        # Empty result
         elif node.result() is None:
             pass
+        # Triplet result
         else:
-            value, stamp, quality = self.normalize_attribute_value(
-                attr, *node.result())
+            value, stamp, quality = \
+                self.normalize_attribute_value(attr, *node.result())
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
 

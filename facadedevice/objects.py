@@ -125,6 +125,11 @@ class local_attribute(node_object):
                 device.write_to_node(device.graph[key], value))
 
     def configure(self, device):
+        # Configure events
+        attr = getattr(device, self.key)
+        attr.set_archive_event(True, True)
+        attr.set_change_event(True, False)
+        # Build node
         super(local_attribute, self).configure(device)
         node = device.graph[self.key]
         # Add push event callback
