@@ -30,7 +30,10 @@ def test_local_attribute(mocker):
             on_a_mock(*node.result())
 
     change_events, archive_events = event_mock(mocker, Test)
+
+    time.time
     mocker.patch('time.time').return_value = 1.0
+
     on_a_mock = mocker.Mock()
 
     with DeviceTestContext(Test) as proxy:
@@ -74,7 +77,7 @@ def test_local_attribute_callback_error(mocker):
         info = proxy.getinfo()
         print(info)
         assert "Exception while running user callback for node <A>:" in info
-        assert "RuntimeError('Ooops',)" in info
+        assert "  Ooops" in info
 
 
 def test_local_attribute_empty_push(mocker):

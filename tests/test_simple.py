@@ -99,7 +99,7 @@ def test_state_error(mocker):
     mocker.patch('time.time').return_value = 1.0
     change_events, archive_events = event_mock(mocker, Test)
     expected_status = "Exception while updating node <State>:\n"
-    expected_status += "  RuntimeError('Ooops',)"
+    expected_status += "  Ooops"
 
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.FAULT
