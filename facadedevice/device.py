@@ -3,12 +3,15 @@
 # Imports
 import time
 
-# Base imports
-from facadedevice.graph import triplet, Graph, context, INVALID
+# Graph imports
+from facadedevice.graph import triplet, Graph, INVALID
 
-# Common imports
+# Exception imports
+from facadedevice.exception import to_dev_failed, context
+
+# Utils imports
 from facadedevice.utils import EnhancedDevice, aggregate_qualities
-from facadedevice.utils import to_dev_failed, get_default_attribute_value
+from facadedevice.utils import get_default_attribute_value
 
 # Object imports
 from facadedevice.objects import class_object, local_attribute, NONE_STRING

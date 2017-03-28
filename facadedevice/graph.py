@@ -1,10 +1,9 @@
+"""Provide objects for building reactive graphs."""
 
+# Imports
 
-import sys
 import warnings
-
 from functools import partial
-from contextlib import contextmanager
 from collections import Mapping, namedtuple, defaultdict
 
 from numpy import array_equal
@@ -49,37 +48,6 @@ triplet.__eq__ = compare_triplet
 triplet.__ne__ = lambda self, arg: not self.__eq__(arg)
 triplet.__init__ = lambda self, *args: assert_triplet(self)
 triplet.from_attr_value = classmethod(from_attr_value)
-
-
-# Exception context
-
-class ContextException(Exception):
-
-    def __init__(self, base, context, origin, traceback):
-        self.base = base
-        self.context = context
-        self.origin = origin
-        self.__traceback__ = traceback
-
-    @property
-    def desc(self):
-        return repr(self)
-
-    def __repr__(self):
-        base = repr(self.base).splitlines()
-        indented = '\n'.join('  ' + line for line in base)
-        return "Exception while {} {}:\n{}".format(
-            self.context, self.origin, indented)
-
-
-@contextmanager
-def context(msg, origin):
-    try:
-        yield
-    except Exception as exc:
-        _, _, tb = sys.exc_info()
-        raise ContextException(
-            exc, msg, origin, tb)
 
 
 # Node object
