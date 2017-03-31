@@ -2,6 +2,7 @@
 
 # Imports
 import time
+import collections
 
 # Graph imports
 from facadedevice.graph import triplet, Graph, INVALID
@@ -69,6 +70,11 @@ class Facade(_Facade):
         return self._graph
 
     # Helper
+
+    def get_combined_results(self, name):
+        subnodes = self.graph.subnodes(name)
+        return collections.OrderedDict(
+            (node.remote_attr, node.result()) for node in subnodes)
 
     def normalize_attribute_value(self, attr, value, stamp, quality):
         if value is None:
