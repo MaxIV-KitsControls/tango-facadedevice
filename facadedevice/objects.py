@@ -91,20 +91,26 @@ class local_attribute(node_object):
              It is called with the corresponding node as an argument
     """
 
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, create_attribute=True, **kwargs):
+        if not create_attribute and kwargs:
+            raise ValueError("Attribute creation is disabled")
+        self.kwargs = kwargs if create_attribute else None
 
     # Properties
 
     @property
     def use_default_write(self):
-        return (self.kwargs.get('access') == AttrWriteType.READ_WRITE and
+        return (self.kwargs is not None and
+                self.kwargs.get('access') == AttrWriteType.READ_WRITE and
                 not set(self.kwargs) & set(['fwrite', 'fset']))
 
     # Configuration methods
 
     def update_class(self, key, dct):
         super(local_attribute, self).update_class(key, dct)
+        # Attribute creation disabled
+        if self.kwargs is None:
+            return
         kwargs = dict(self.kwargs)
         # Read method
         kwargs['fget'] = lambda device, attr=None: \
@@ -125,13 +131,16 @@ class local_attribute(node_object):
                 device.write_to_node(device.graph[key], value))
 
     def configure(self, device):
+        # Build node
+        super(local_attribute, self).configure(device)
+        node = device.graph[self.key]
+        # Attribute creation disabled
+        if self.kwargs is None:
+            return
         # Configure events
         attr = getattr(device, self.key)
         attr.set_archive_event(True, True)
         attr.set_change_event(True, False)
-        # Build node
-        super(local_attribute, self).configure(device)
-        node = device.graph[self.key]
         # Add push event callback
         node.callbacks.append(partial(
             device.run_callback,
@@ -148,10 +157,11 @@ class logical_attribute(local_attribute):
     Logical attributes also support the standard attribute keywords.
     """
 
-    def __init__(self, bind, **kwargs):
+    def __init__(self, bind, create_attribute=True, **kwargs):
         self.bind = bind
         self.method = None
-        super(logical_attribute, self).__init__(**kwargs)
+        super(logical_attribute, self).__init__(
+            create_attribute=create_attribute, **kwargs)
 
     def __call__(self, method):
         self.method = method
@@ -180,10 +190,13 @@ class proxy_attribute(logical_attribute):
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, property_name, create_property=True, **kwargs):
+    def __init__(self, property_name,
+                 create_property=True, create_attribute=True,
+                 **kwargs):
         self.property_name = property_name
         self.create_property = create_property
-        super(proxy_attribute, self).__init__(None, **kwargs)
+        super(proxy_attribute, self).__init__(
+            None, create_attribute=create_attribute, **kwargs)
 
     def update_class(self, key, dct):
         # Parent method
@@ -247,6 +260,8 @@ class combined_attribute(proxy_attribute):
             Name of the property containing the attribute names.
         create_property (str):
             Create the corresponding device property. Default is True.
+        create_attribute (str):
+            Create the corresponding tango attribute. Default is True.
 
     Also supports the standard attribute keywords.
     """
@@ -277,7 +292,11 @@ class combined_attribute(proxy_attribute):
             return
         # Pattern matching
         if len(attrs) == 1:
-            attrs = list(attributes_from_wildcard(attrs[0]))
+            wildcard = attrs[0]
+            attrs = list(attributes_from_wildcard(wildcard))
+            if not attrs:
+                msg = 'No attributes matching {} wildcard'
+                raise ValueError(msg.format(wildcard))
         # Check attributes
         else:
             for attr in attrs:
