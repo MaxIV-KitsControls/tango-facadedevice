@@ -87,8 +87,8 @@ class local_attribute(node_object):
     Local attributes support the standard attribute keywords.
 
     Args:
-        callback (str or function): method to call when the attribute changes.
-             It is called with the corresponding node as an argument
+        create_attribute (str):
+            Create the corresponding tango attribute. Default is True.
     """
 
     def __init__(self, create_attribute=True, **kwargs):
@@ -155,6 +155,12 @@ class logical_attribute(local_attribute):
 
     Use it as a decorator to register the function that make this computation.
     Logical attributes also support the standard attribute keywords.
+
+    Args:
+        bind (list of str):
+            List of node names to bind to. It has to contain at least one name.
+        create_attribute (str):
+            Create the corresponding tango attribute. Default is True.
     """
 
     def __init__(self, bind, create_attribute=True, **kwargs):
@@ -186,6 +192,8 @@ class proxy_attribute(logical_attribute):
             Name of the property containing the attribute name.
         create_property (str):
             Create the corresponding device property. Default is True.
+        create_attribute (str):
+            Create the corresponding tango attribute. Default is True.
 
     Also supports the standard attribute keywords.
     """
@@ -315,7 +323,13 @@ class combined_attribute(proxy_attribute):
 # State attribute
 
 class state_attribute(node_object):
-    """Tango state attribute with event support."""
+    """Tango state attribute with event support.
+
+    Args:
+        bind (list of str):
+            List of node names to bind to, or None to disable the binding.
+            Default is None.
+    """
 
     def __init__(self, bind=None):
         self.bind = bind

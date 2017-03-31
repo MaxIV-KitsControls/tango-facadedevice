@@ -1,4 +1,4 @@
-"""Provide the facade device class and metaclass"""
+"""Provide the facade device class and metaclass."""
 
 # Imports
 import time
