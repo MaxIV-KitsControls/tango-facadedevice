@@ -10,7 +10,7 @@ from tango import AttrQuality, DevState
 from tango import AttrWriteType, DevFailed
 
 # Proxy imports
-from facadedevice import Facade
+from facadedevice import Facade, triplet
 from facadedevice import local_attribute
 
 # Local imports
@@ -111,3 +111,47 @@ def test_local_attribute_empty_push(mocker):
         assert not archive_events['A'].called
         info = proxy.getinfo()
         assert "No errors in history" in info
+
+
+def test_local_attribute_non_exposed(mocker):
+
+    class Test(Facade):
+
+        A = local_attribute(
+            create_attribute=False)
+
+        @A.notify
+        def on_a(self, node):
+            on_a_mock(*node.result())
+
+        @command(dtype_in=float)
+        def set_a(self, value):
+            result = triplet(value, time.time())
+            self.graph['A'].set_result(result)
+
+    mocker.patch('time.time').return_value = 1.0
+
+    on_a_mock = mocker.Mock()
+
+    with DeviceTestContext(Test) as proxy:
+        # Test
+        assert proxy.state() == DevState.UNKNOWN
+        with pytest.raises(AttributeError):
+            proxy.A
+        proxy.set_a(21)
+        # Check callback
+        expected = 21, 1.0, AttrQuality.ATTR_VALID
+        on_a_mock.assert_called_once_with(*expected)
+
+
+def test_invalid_local_attribute(mocker):
+
+    with pytest.raises(ValueError) as context:
+
+        class Test(Facade):
+
+            A = local_attribute(
+                dtype=float,
+                create_attribute=False)
+
+    assert 'Attribute creation is disabled' in str(context.value)

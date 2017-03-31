@@ -210,3 +210,92 @@ def test_combined_attribute_with_wildcard(mocker):
         expected = 6.6, 0.3, AttrQuality.ATTR_ALARM
         change_events['attr'].assert_called_once_with(*expected)
         archive_events['attr'].assert_called_once_with(*expected)
+
+
+def test_combined_attribute_with_empty_wildcard(mocker):
+
+    class Test(Facade):
+
+        @combined_attribute(
+            dtype=float,
+            property_name='prop')
+        def attr(self, *values):
+            return sum(values)
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+    mocker.patch('facadedevice.utils.Database')
+    get_device_exported = utils.Database.return_value.get_device_exported
+    get_device_exported.return_value = ['a/b/c', 'a/b/d', 'a/b/e']
+
+    props = {'prop': ['i/j/*/z']}
+
+    with DeviceTestContext(Test, properties=props) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.FAULT
+        expected = "No attributes matching i/j/*/z wildcard"
+        assert expected in proxy.status()
+
+
+def test_combined_attribute_non_exposed(mocker):
+
+    class Test(Facade):
+
+        @combined_attribute(
+            create_attribute=False,
+            property_name='prop')
+        def attr(self, *values):
+            return sum(values)
+
+        @attr.notify
+        def on_attr(self, node):
+            if node.exception() or node.result() is None:
+                pass
+            cb_mock(*node.result())
+
+    cb_mock = mocker.Mock()
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+    inner_proxy = utils.DeviceProxy.return_value
+    inner_proxy.dev_name.return_value = 'a/b/c'
+    subscribe_event = inner_proxy.subscribe_event
+
+    props = {'prop': ['a/b/c/d', 'e/f/g/h', 'i/j/k/l']}
+
+    with DeviceTestContext(Test, properties=props) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Check mocks
+        utils.DeviceProxy.assert_any_call('a/b/c')
+        utils.DeviceProxy.assert_any_call('e/f/g')
+        utils.DeviceProxy.assert_any_call('i/j/k')
+        assert subscribe_event.called
+        cbs = [x[0][2] for x in subscribe_event.call_args_list]
+        for attr, cb in zip('dhl', cbs):
+            args = attr, EventType.CHANGE_EVENT, cb, [], False
+            subscribe_event.assert_any_call(*args)
+        # Trigger events
+        event = mocker.Mock(spec=EventData)
+        event.errors = False
+        # First event
+        event.attr_name = 'a/b/c/d'
+        event.attr_value.value = 1.1
+        event.attr_value.time.totime.return_value = 0.1
+        event.attr_value.quality = AttrQuality.ATTR_CHANGING
+        cbs[0](event)
+        # Second event
+        event.attr_name = 'e/f/g/h'
+        event.attr_value.value = 2.2
+        event.attr_value.time.totime.return_value = 0.2
+        event.attr_value.quality = AttrQuality.ATTR_VALID
+        cbs[1](event)
+        # Third event
+        event.attr_name = 'i/j/k/l'
+        event.attr_value.value = 3.3
+        event.attr_value.time.totime.return_value = 0.3
+        event.attr_value.quality = AttrQuality.ATTR_ALARM
+        cbs[2](event)
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Check events
+        expected = 6.6, 0.3, AttrQuality.ATTR_ALARM
+        cb_mock.assert_called_once_with(*expected)
