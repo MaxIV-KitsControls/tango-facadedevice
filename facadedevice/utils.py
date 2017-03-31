@@ -84,9 +84,9 @@ def attributes_from_wildcard(wildcard):
     for device in db.get_device_exported(wdev):
         proxy = create_device_proxy(device)
         infos = proxy.attribute_list_query()
-        attrs = sorted(info.name for info in infos)
+        attrs = sorted(info.name.lower() for info in infos)
         for attr in fnmatch.filter(attrs, wattr):
-            yield '{}/{}'.format(device, attr)
+            yield '{}/{}'.format(device.lower(), attr)
 
 
 # Tango command check

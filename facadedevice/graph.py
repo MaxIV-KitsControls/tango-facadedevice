@@ -135,6 +135,15 @@ class Graph(Mapping):
         self._pending = set()
         self._propagating = False
 
+    # Accessors
+
+    def subnodes(self, name):
+        node = self._nodes[name]
+        if node not in self._rules:
+            return []
+        _, bind = self._rules[node]
+        return [self._nodes[subname] for subname in bind]
+
     # Create graph
 
     def add_node(self, node):
@@ -158,7 +167,7 @@ class Graph(Mapping):
         # Loop over rules
         for node, (func, bind) in self._rules.items():
             # Set update callbacks
-            publishers = tuple(self._nodes[name] for name in bind)
+            publishers = [self._nodes[subname] for subname in bind]
             self._updates[node] = partial(func, *publishers)
             # Set subscriptions
             for publisher in publishers:

@@ -228,29 +228,30 @@ class proxy_attribute(logical_attribute):
         attr = getattr(device, self.property_name).strip().lower()
         # Ignore attribute
         if attr == NONE_STRING:
-            node.subnodes = []
             return
         # Check attribute
         check_attribute(attr, writable=self.use_default_write)
         # Add attribute
         if self.method is None:
             node.remote_attr = attr
-            node.subnodes = [node]
             return
         # Add subnode
         bind = (self.key + "[0]",)
         subnode = RestrictedNode(bind[0])
         subnode.remote_attr = attr
-        node.subnodes = [subnode]
         device.graph.add_node(subnode)
         # Binding
         self.bind_node(device, node, bind, self.method)
 
     def connect(self, device):
-        # Get node
         node = device.graph[self.key]
+        # Get subnodes
+        if hasattr(node, 'remote_attr'):
+            subnodes = [node]
+        else:
+            subnodes = device.graph.subnodes(self.key)
         # Subscribe
-        for subnode in node.subnodes:
+        for subnode in subnodes:
             device.subscribe_for_node(subnode.remote_attr, subnode)
 
 
@@ -286,8 +287,6 @@ class combined_attribute(proxy_attribute):
             dct[self.property_name] = device_property(dtype=(str,), doc=doc)
 
     def configure_binding(self, device, node):
-        # Init subnodes
-        node.subnodes = []
         # Strip property
         attrs = getattr(device, self.property_name)
         attrs = list(filter(None, map(str.strip, map(str.lower, attrs))))
@@ -309,14 +308,16 @@ class combined_attribute(proxy_attribute):
         else:
             for attr in attrs:
                 check_attribute(attr)
+        # Build the bindings
+        bind = tuple(
+            '{}[{}]'.format(self.key, i)
+            for i, _ in enumerate(attrs))
         # Build the subnodes
-        for i, attr in enumerate(attrs):
-            subnode = RestrictedNode('{}[{}]'.format(self.key, i))
+        for key, attr in zip(bind, attrs):
+            subnode = RestrictedNode(key)
             subnode.remote_attr = attr
             device.graph.add_node(subnode)
-            node.subnodes.append(subnode)
         # Set the binding
-        bind = tuple(subnode.name for subnode in node.subnodes)
         self.bind_node(device, node, bind, self.method)
 
 
