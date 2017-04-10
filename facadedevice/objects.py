@@ -441,7 +441,7 @@ class proxy_command(class_object):
         # Default value
         if '/' not in name:
             value = literal_eval(name)
-            subcommand = lambda *args: value  # noqa: E731
+            subcommand = partial(device.emulate_subcommand, value)
         # Check subcommand
         else:
             subcommand = make_subcommand(name, attr=self.write_attribute)

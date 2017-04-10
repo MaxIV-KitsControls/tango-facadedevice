@@ -81,6 +81,11 @@ class Facade(_Facade):
         dformat = attr.get_data_format()
         return get_default_attribute_value(dformat, dtype)
 
+    def emulate_subcommand(self, result, *args):
+        if args or result is None:
+            raise ValueError('This proxy command is disabled')
+        return result
+
     # Initialization
 
     def safe_init_device(self):
