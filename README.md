@@ -69,18 +69,24 @@ to run periodic update (by binding to a logical attribute).
 Example
 -------
 
+A real-world example used at MAX-IV:
+
 ```python
+from facadedevice import Facade, proxy_command
+from facadedevice import proxy_attribute, logical_attribute, state_attribute
+
+
 class CameraScreen(Facade):
 
     # Proxy attributes
 
     StatusIn = proxy_attribute(
         dtype=bool,
-        prop="StatusInTag")
+        property_name="StatusInAttribute")
 
     StatusOut = proxy_attribute(
         dtype=bool,
-        prop="StatusOutTag")
+        property_name="StatusOutAttribute")
 
     # Logical attributes
 
@@ -88,33 +94,45 @@ class CameraScreen(Facade):
         dtype=bool,
         bind=['StatusIn', 'StatusOut'])
     def Error(self, status_in, status_out):
-        return status_in == status_out
+        return status_in and status_out
+
+    @logical_attribute(
+        dtype=bool,
+        bind=['StatusIn', 'StatusOut'])
+    def Moving(self, status_in, status_out):
+        return not status_in and not status_out
 
     # Proxy commands
 
     @proxy_command(
-        prop="MoveInTag",
-        attr=True)
+        property_name="MoveInAttribute",
+        write_attribute=True)
     def MoveIn(self, subcommand):
         subcommand(1)
 
     @proxy_command(
-        prop="MoveOutTag",
-        attr=True)
+        property_name="MoveOutAttribute",
+        write_attribute=True)
     def MoveOut(self, subcommand):
         subcommand(1)
 
     # State and status
 
     @state_attribute(
-	    bind=['Error', 'StatusIn'])
+        bind=['Error', 'StatusIn'])
     def state(self, error, status_in):
         if error:
-            return DevState.FAULT, "Conflict between IN and OUT"
-        if status_in:
-            return DevState.INSERT, "IN"
-        return DevState.EXTRACT, "OUT"
+            return DevState.FAULT, "A conflict has been detected"
+        elif moving:
+            return DevState.MOVING, "The screen is moving"
+        elif status_in:
+            return DevState.INSERT, "The screen is inserted"
+        else:
+            return DevState.EXTRACT, "The screen is exctracted"
 
+
+if __name__ == '__main__':
+    CameraScreen.run_server()
 ```
 
 Unit testing
