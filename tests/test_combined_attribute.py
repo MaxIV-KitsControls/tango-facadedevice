@@ -132,16 +132,14 @@ def test_disabled_combined_attribute(mocker):
         def attr(self, *values):
             return sum(values)
 
-    props = {'prop': ['NONE']}
+    props = {'prop': ['None']}
 
     with DeviceTestContext(Test, properties=props) as proxy:
         # The device not in fault
+        print(proxy.status())
         assert proxy.state() == DevState.UNKNOWN
         # The attribute is not available
-        with pytest.raises(DevFailed) as ctx:
-            proxy.attr
-        message = str(ctx.value)
-        assert "Read value for attribute attr has not been updated" in message
+        assert proxy.attr is None
 
 
 def test_combined_attribute_with_wildcard(mocker):

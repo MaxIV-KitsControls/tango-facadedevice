@@ -155,7 +155,6 @@ def test_writable_proxy_attribute(mocker):
         # Test write
         utils.DeviceProxy.reset_mock()
         proxy.write_attribute('attr', 32.)
-        utils.DeviceProxy.assert_called_with('a/b/c')
         inner_proxy.write_attribute.assert_called_with('d', 32.)
 
 
@@ -316,16 +315,13 @@ def test_disabled_proxy_attribute(mocker):
     change_events, archive_events = event_mock(mocker, Test)
     device_proxy = mocker.patch('facadedevice.utils.DeviceProxy')
 
-    with DeviceTestContext(Test, properties={'prop': 'NONE'}) as proxy:
+    with DeviceTestContext(Test, properties={'prop': 'None'}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         assert not device_proxy.called
         # Test write
-        with pytest.raises(DevFailed) as ctx:
-            proxy.attr = 3
-        # Check
-        assert "This proxy command is disabled" in str(ctx.value)
+        assert proxy.attr is None
 
 
 def test_non_writable_proxy_attribute(mocker):
@@ -364,6 +360,22 @@ def test_missing_property():
         assert "Missing property: prop" in proxy.status()
         assert "The device is currently stopped" in proxy.getinfo()
         assert "Missing property: prop" in proxy.getinfo()
+
+
+def test_empty_property():
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            property_name='prop',
+            access=AttrWriteType.READ_WRITE)
+
+    with DeviceTestContext(Test, properties={'prop': ''}) as proxy:
+        assert proxy.state() == DevState.FAULT
+        assert "Property 'prop' is empty" in proxy.status()
+        assert "The device is currently stopped" in proxy.getinfo()
+        assert "Property 'prop' is empty" in proxy.getinfo()
 
 
 def test_proxy_attribute_broken_internals(mocker):

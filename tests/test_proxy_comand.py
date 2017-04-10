@@ -74,13 +74,10 @@ def test_no_proxy_command(mocker):
 
     mocker.patch('facadedevice.utils.DeviceProxy')
 
-    with DeviceTestContext(Test, properties={'prop': 'NONE'}) as proxy:
+    with DeviceTestContext(Test, properties={'prop': '0'}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         assert not utils.DeviceProxy.called
         # Run command
-        with pytest.raises(DevFailed) as ctx:
-            assert proxy.double(3)
-        # Check
-        assert "This proxy command is disabled" in str(ctx.value)
+        assert proxy.double(3) == 0
