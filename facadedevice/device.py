@@ -15,7 +15,7 @@ from facadedevice.utils import EnhancedDevice, aggregate_qualities
 from facadedevice.utils import get_default_attribute_value
 
 # Object imports
-from facadedevice.objects import class_object, local_attribute, NONE_STRING
+from facadedevice.objects import class_object, local_attribute
 
 # Tango imports
 from tango.server import command
@@ -76,20 +76,18 @@ class Facade(_Facade):
         return collections.OrderedDict(
             (node.remote_attr, node.result()) for node in subnodes)
 
-    def normalize_attribute_value(self, attr, value, stamp, quality):
-        if value is None:
-            quality = INVALID
-        if quality == INVALID:
-            dtype = attr.get_data_type()
-            dformat = attr.get_data_format()
-            value = get_default_attribute_value(dformat, dtype)
-        return value, stamp, quality
+    def get_default_value(self, attr):
+        dtype = attr.get_data_type()
+        dformat = attr.get_data_format()
+        return get_default_attribute_value(dformat, dtype)
 
     # Initialization
 
     def safe_init_device(self):
         """Initialize the device."""
+        # Init data structures
         self._graph = Graph()
+        self._subcommand_dict = {}
         # Get properties
         with context('getting', 'properties'):
             super(Facade, self).safe_init_device()
@@ -167,31 +165,24 @@ class Facade(_Facade):
             return
         value, stamp, quality = node.result()
         if attr:
-            attr.set_value_date_quality(
-                *self.normalize_attribute_value(
-                    attr, value, stamp, quality))
+            if value is None:
+                value = self.get_default_value(attr)
+            attr.set_value_date_quality(value, stamp, quality)
         return value, stamp, quality
 
     def write_to_node(self, node, value):
         """Used when writing a local attribute"""
-        result = triplet(value, time.time())
-        node.set_result(result)
+        node.set_result(triplet(value))
 
-    def run_proxy_command(self, factory, prop, value):
+    def run_proxy_command(self, key, value):
         """Used when writing a proxy attribute"""
         return self.run_proxy_command_context(
-            factory, prop,
-            lambda subcommand, value: subcommand(value),
-            value)
+            key, lambda subcommand, value: subcommand(value), value)
 
-    def run_proxy_command_context(self, factory, prop, ctx, *values):
+    def run_proxy_command_context(self, key, ctx, *values):
         """Used when running a proxy command"""
-        name = getattr(self, prop).strip().lower()
-        # Disabled command
-        if name == NONE_STRING:
-            raise ValueError('This proxy command is disabled')
         # Run subcommand in context
-        subcommand = factory(getattr(self, prop))
+        subcommand = self._subcommand_dict[key]
         return ctx(subcommand, *values)
 
     # Controlled callbacks
@@ -226,10 +217,7 @@ class Facade(_Facade):
             if isinstance(result, triplet):
                 return result
             # Create triplet
-            if result is None:
-                quality = INVALID
-            else:
-                quality = aggregate_qualities(qualities)
+            quality = aggregate_qualities(qualities)
             return triplet(result, max(stamps), quality)
 
     # Dedicated callbacks
@@ -267,8 +255,9 @@ class Facade(_Facade):
             pass
         # Triplet result
         else:
-            value, stamp, quality = \
-                self.normalize_attribute_value(attr, *node.result())
+            value, stamp, quality = node.result()
+            if value is None:
+                value = self.get_default_value(attr)
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
 

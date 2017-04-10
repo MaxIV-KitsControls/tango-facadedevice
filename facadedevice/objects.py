@@ -1,6 +1,7 @@
 """Provide class objects for the facade device."""
 
 # Imports
+from ast import literal_eval
 from functools import partial
 
 # Tango imports
@@ -8,13 +9,9 @@ from tango import AttrWriteType
 from tango.server import device_property, command, attribute
 
 # Local imports
-from facadedevice.graph import RestrictedNode
+from facadedevice.graph import RestrictedNode, triplet
 from facadedevice.utils import attributes_from_wildcard
 from facadedevice.utils import check_attribute, make_subcommand
-
-# Constants
-
-NONE_STRING = "none"
 
 
 # Base class object
@@ -217,20 +214,33 @@ class proxy_attribute(logical_attribute):
         if not self.use_default_write:
             return
         # Set write method
-        factory = partial(make_subcommand, attr=True)
         dct[key] = dct[key].setter(
             lambda device, value:
                 device.run_proxy_command(
-                    factory, self.property_name, value))
+                    key, value))
 
     def configure_binding(self, device, node):
         # Get properties
-        attr = getattr(device, self.property_name).strip().lower()
-        # Ignore attribute
-        if attr == NONE_STRING:
+        attr = getattr(device, self.property_name).strip()
+        # Empty property
+        if not attr:
+            msg = 'Property {!r} is empty'
+            raise ValueError(msg.format(self.property_name))
+        # Default value
+        if '/' not in attr:
+            node.default_value = literal_eval(attr)
+            # Make subcommand
+            if self.use_default_write:
+                subcommand = partial(device.write_to_node, node)
+                device._subcommand_dict[self.key] = subcommand
             return
         # Check attribute
+        attr = attr.lower()
         check_attribute(attr, writable=self.use_default_write)
+        # Make subcommand
+        if self.use_default_write:
+            subcommand = make_subcommand(attr, attr=True)
+            device._subcommand_dict[self.key] = subcommand
         # Add attribute
         if self.method is None:
             node.remote_attr = attr
@@ -245,6 +255,9 @@ class proxy_attribute(logical_attribute):
 
     def connect(self, device):
         node = device.graph[self.key]
+        # Set default_value
+        if hasattr(node, 'default_value'):
+            node.set_result(triplet(node.default_value))
         # Get subnodes
         if hasattr(node, 'remote_attr'):
             subnodes = [node]
@@ -289,14 +302,20 @@ class combined_attribute(proxy_attribute):
     def configure_binding(self, device, node):
         # Strip property
         attrs = getattr(device, self.property_name)
-        attrs = list(filter(None, map(str.strip, map(str.lower, attrs))))
+        if not isinstance(attrs, str):
+            attrs = '\n'.join(attrs)
+        attrs = attrs.strip()
         # Empty property
         if not attrs:
             msg = 'Property {!r} is empty'
             raise ValueError(msg.format(self.property_name))
-        # Ignore attribute
-        if len(attrs) == 1 and attrs[0] == NONE_STRING:
+        # Default value
+        if '/' not in attrs:
+            node.default_value = literal_eval(attrs)
             return
+        # Split lines
+        attrs = attrs.lower().splitlines()
+        attrs = list(filter(None, map(str.strip, attrs)))
         # Pattern matching
         if len(attrs) == 1:
             wildcard = attrs[0]
@@ -397,12 +416,11 @@ class proxy_command(class_object):
         return self
 
     def update_class(self, key, dct):
+        super(proxy_command, self).update_class(key, dct)
         # Set command
-        factory = partial(make_subcommand, attr=self.write_attribute)
         dct[key] = lambda device, *args: \
             device.run_proxy_command_context(
-                factory, self.property_name,
-                self.method.__get__(device), *args)
+                key, self.method.__get__(device), *args)
         dct[key].__name__ = key
         dct[key] = command(**self.kwargs)(dct[key])
         # Set is allowed method
@@ -419,9 +437,13 @@ class proxy_command(class_object):
             dct[self.property_name] = device_property(dtype=str, doc=doc)
 
     def configure(self, device):
-        name = getattr(device, self.property_name).strip().lower()
-        # Disabled command
-        if name == NONE_STRING:
-            return
+        name = getattr(device, self.property_name).strip()
+        # Default value
+        if '/' not in name:
+            value = literal_eval(name)
+            subcommand = lambda *args: value  # noqa: E731
         # Check subcommand
-        make_subcommand(name, attr=self.write_attribute)
+        else:
+            subcommand = make_subcommand(name, attr=self.write_attribute)
+        # Set subcommand
+        device._subcommand_dict[self.key] = subcommand
