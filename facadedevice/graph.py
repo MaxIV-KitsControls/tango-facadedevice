@@ -2,6 +2,7 @@
 
 # Imports
 
+import time
 import warnings
 from functools import partial
 from collections import Mapping, namedtuple, defaultdict
@@ -20,6 +21,18 @@ INVALID = AttrQuality.ATTR_INVALID
 triplet = namedtuple("triplet", ("value", "stamp", "quality"))
 
 
+def new_triplet(cls, value, stamp=None, quality=VALID):
+    if stamp is None:
+        stamp = time.time()
+    if not isinstance(stamp, float):
+        raise TypeError("The timestamp is not a float")
+    if not isinstance(quality, int):
+        raise TypeError("The quality is not a integer")
+    if value is None or quality == INVALID:
+        value, quality = None, INVALID
+    return cls.__rawnew__(cls, value, stamp, quality)
+
+
 def compare_triplet(a, b):
     assert isinstance(a, triplet)
     try:
@@ -31,22 +44,14 @@ def compare_triplet(a, b):
             array_equal(a.value, value))
 
 
-def assert_triplet(a):
-    assert isinstance(a, triplet)
-    if not isinstance(a.stamp, float):
-        raise TypeError("The timestamp is not a float")
-    if not isinstance(a.quality, int):
-        raise TypeError("The quality is not a integer")
-
-
 def from_attr_value(cls, attr_value):
     return cls(attr_value.value, attr_value.time.totime(), attr_value.quality)
 
 
-triplet.__new__.__defaults__ = (VALID,)
+triplet.__rawnew__ = staticmethod(triplet.__new__)
+triplet.__new__ = staticmethod(new_triplet)
 triplet.__eq__ = compare_triplet
 triplet.__ne__ = lambda self, arg: not self.__eq__(arg)
-triplet.__init__ = lambda self, *args: assert_triplet(self)
 triplet.from_attr_value = classmethod(from_attr_value)
 
 
