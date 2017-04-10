@@ -63,7 +63,7 @@ def test_complex_proxy_command(mocker):
         assert inner_proxy.command_inout.call_args_list == expected
 
 
-def test_no_proxy_command(mocker):
+def test_disabled_proxy_command(mocker):
 
     class Test(Facade):
 
@@ -74,10 +74,32 @@ def test_no_proxy_command(mocker):
 
     mocker.patch('facadedevice.utils.DeviceProxy')
 
-    with DeviceTestContext(Test, properties={'prop': '0'}) as proxy:
+    with DeviceTestContext(Test, properties={'prop': 'None'}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
         assert not utils.DeviceProxy.called
         # Run command
-        assert proxy.double(3) == 0
+        with pytest.raises(DevFailed) as ctx:
+            proxy.double(3)
+        # Check
+        assert "This proxy command is disabled" in str(ctx.value)
+
+
+def test_emulated_proxy_command(mocker):
+
+    class Test(Facade):
+
+        get_pi = proxy_command(
+            property_name='prop',
+            dtype_out=float)
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+
+    with DeviceTestContext(Test, properties={'prop': '3.14'}) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Check mocks
+        assert not utils.DeviceProxy.called
+        # Run command
+        assert proxy.get_pi() == 3.14

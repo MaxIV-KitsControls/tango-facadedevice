@@ -324,6 +324,29 @@ def test_disabled_proxy_attribute(mocker):
         assert proxy.attr is None
 
 
+def test_emulated_proxy_attribute(mocker):
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            property_name='prop',
+            access=AttrWriteType.READ_WRITE)
+
+    change_events, archive_events = event_mock(mocker, Test)
+    device_proxy = mocker.patch('facadedevice.utils.DeviceProxy')
+
+    with DeviceTestContext(Test, properties={'prop': '0.5'}) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Check mocks
+        assert not device_proxy.called
+        # Test write
+        assert proxy.attr == 0.5
+        proxy.attr += 1
+        assert proxy.attr == 1.5
+
+
 def test_non_writable_proxy_attribute(mocker):
 
     class Test(Facade):
