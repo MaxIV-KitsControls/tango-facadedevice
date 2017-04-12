@@ -27,11 +27,16 @@ def test_compare_triplet():
     assert a != 'tes' != b
 
 
-def test_assert_triplet():
+def test_triplet_constructor():
     with pytest.raises(TypeError):
         triplet([1], 'not a float')
     with pytest.raises(TypeError):
         triplet([1], 0.0, 'not a quality')
+    with pytest.raises(TypeError):
+        triplet(triplet(1))
+    value, stamp, quality = triplet(1)
+    assert value == 1
+    assert quality == VALID
 
 
 def test_node_setters(mocker):
