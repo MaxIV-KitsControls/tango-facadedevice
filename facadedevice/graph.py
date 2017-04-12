@@ -22,6 +22,8 @@ triplet = namedtuple("triplet", ("value", "stamp", "quality"))
 
 
 def new_triplet(cls, value, stamp=None, quality=VALID):
+    if isinstance(value, triplet):
+        raise TypeError("The value cannot be a triplet")
     if stamp is None:
         stamp = time.time()
     if not isinstance(stamp, float):
