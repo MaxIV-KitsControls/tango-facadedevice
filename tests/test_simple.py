@@ -241,3 +241,34 @@ def test_simple_device_invalid_state(mocker):
         archive_events['State'].assert_called_with(*expected_state)
         change_events['Status'].assert_called_with(*expected_status)
         archive_events['Status'].assert_called_with(*expected_status)
+
+
+def test_simple_device_state_type_error(mocker):
+
+    class Test(TimedFacade):
+
+        @state_attribute(bind=['Time'])
+        def State(self, time):
+            return "Not a state"
+
+    time.time
+    mocker.patch('time.time').return_value = 1.0
+    change_events, archive_events = event_mock(mocker, Test)
+    expected = """\
+Exception while setting state and status:
+  Python argument types in
+      DeviceImpl.set_state(Test, str)
+  did not match C++ signature:
+      set_state(Tango::DeviceImpl {lvalue}, Tango::DevState)"""
+
+    with DeviceTestContext(Test, debug=3) as proxy:
+        assert proxy.state() == DevState.FAULT
+        assert proxy.status() == expected
+        assert proxy.read_attribute("State").value == DevState.FAULT
+        assert proxy.read_attribute("State").quality == VALID
+        expected_state = DevState.FAULT, 1.0, VALID
+        expected_status = expected, 1.0, VALID
+        change_events['State'].assert_called_with(*expected_state)
+        archive_events['State'].assert_called_with(*expected_state)
+        change_events['Status'].assert_called_with(*expected_status)
+        archive_events['Status'].assert_called_with(*expected_status)

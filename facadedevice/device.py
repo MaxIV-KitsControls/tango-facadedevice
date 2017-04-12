@@ -228,25 +228,36 @@ class Facade(_Facade):
     # Dedicated callbacks
 
     def set_state_from_node(self, node):
+        # Forward exception
         if node.exception() is not None:
             self.register_exception(node.exception())
-        elif node.result() is None:
+            return
+        # Empty node
+        if node.result() is None:
             self.set_state(DevState.UNKNOWN)
             self.set_status("The state is currently not available.")
-        else:
-            value, stamp, quality = node.result()
-            try:
-                if value is None or quality == INVALID:
-                    state = DevState.FAULT
-                    status = "The state cannot be computed."
-                    status += " Some values are invalid."
-                else:
-                    state, status = value
-            except TypeError:
-                state = value
-                status = "The device is in {} state.".format(value)
-            self.set_state(state, stamp, quality)
-            self.set_status(status, stamp, quality)
+            return
+        # Unpack triplet
+        value, stamp, quality = node.result()
+        # Invalid value
+        if value is None:
+            value = (
+                DevState.FAULT,
+                "The state cannot be computed. Some values are invalid.")
+        # Unpack value
+        try:
+            state, status = value
+        except (TypeError, ValueError):
+            state = value
+            status = "The device is in {} state.".format(value)
+        # Set state and status
+        try:
+            with context('setting', 'state and status'):
+                self.set_state(state, stamp, quality)
+                self.set_status(status, stamp, quality)
+        # Exception while setting the state
+        except Exception as exc:
+            self.register_exception(exc)
 
     def push_event_for_node(self, node):
         attr = getattr(self, node.name)
