@@ -320,3 +320,50 @@ def test_logical_attribute_returning_none(mocker):
         expected = 0, 1.0, AttrQuality.ATTR_INVALID
         change_events['B'].assert_called_with(*expected)
         archive_events['B'].assert_called_with(*expected)
+
+
+
+def test_logical_attribute_with_custom_propagation(mocker):
+
+    class Test(Facade):
+
+        @logical_attribute(
+            dtype=float,
+            bind=['A', 'B'],
+            default_propagation=False)
+        def C(self, a, b):
+            return a.result().value / b.result().value
+
+        A = local_attribute(
+            dtype=float,
+            access=AttrWriteType.READ_WRITE)
+
+        B = local_attribute(
+            dtype=float,
+            access=AttrWriteType.READ_WRITE)
+
+    time.time
+    change_events, archive_events = event_mock(mocker, Test)
+    mocker.patch('time.time').return_value = 1.0
+
+    with DeviceTestContext(Test) as proxy:
+        # Test 1
+        with pytest.raises(DevFailed):
+            proxy.A
+        with pytest.raises(DevFailed):
+            proxy.B
+        with pytest.raises(DevFailed):
+            proxy.C
+        # Test 2
+        proxy.A = 21
+        assert proxy.A == 21
+        with pytest.raises(DevFailed):
+            proxy.C
+        # Test 3
+        proxy.B = 7
+        assert proxy.B == 7
+        assert proxy.C == 3
+        # Check events
+        expected = 3.0, 1.0, AttrQuality.ATTR_VALID
+        change_events['C'].assert_called_with(*expected)
+        archive_events['C'].assert_called_with(*expected)
