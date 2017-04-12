@@ -83,6 +83,9 @@ class local_attribute(node_object):
 
     Local attributes support the standard attribute keywords.
 
+    It can be used as a decorator to set a method providing the
+    default value for the corresponding attribute.
+
     Args:
         create_attribute (str):
             Create the corresponding tango attribute. Default is True.
@@ -91,7 +94,12 @@ class local_attribute(node_object):
     def __init__(self, create_attribute=True, **kwargs):
         if not create_attribute and kwargs:
             raise ValueError("Attribute creation is disabled")
+        self.method = None
         self.kwargs = kwargs if create_attribute else None
+
+    def __call__(self, method):
+        self.method = method
+        return self
 
     # Properties
 
@@ -144,6 +152,24 @@ class local_attribute(node_object):
             "pushing events for",
             device.push_event_for_node))
 
+    def connect(self, device):
+        if not self.method:
+            return
+        # Get method
+        node = device.graph[self.key]
+        get_default = self.method.__get__(device)
+        # Get default result
+        try:
+            result = get_default()
+            if not isinstance(result, triplet):
+                result = triplet(result)
+        # Set exception
+        except Exception as exc:
+            node.set_exception(exc)
+        # Set result
+        else:
+            node.set_result(result)
+
 
 # Logical attribute
 
@@ -166,10 +192,6 @@ class logical_attribute(local_attribute):
         super(logical_attribute, self).__init__(
             create_attribute=create_attribute, **kwargs)
 
-    def __call__(self, method):
-        self.method = method
-        return self
-
     def configure(self, device):
         super(logical_attribute, self).configure(device)
         node = device.graph[self.key]
@@ -177,6 +199,9 @@ class logical_attribute(local_attribute):
 
     def configure_binding(self, device, node):
         self.bind_node(device, node, self.bind, self.method)
+
+    def connect(self, device):
+        pass
 
 
 # Proxy attribute
