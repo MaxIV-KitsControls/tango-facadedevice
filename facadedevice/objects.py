@@ -63,7 +63,7 @@ class node_object(class_object):
     # Binding helper
 
     @staticmethod
-    def bind_node(device, node, bind, method):
+    def bind_node(device, node, bind, method, default_propagation):
         if not method:
             raise ValueError('No update method defined')
         if not bind:
@@ -72,7 +72,8 @@ class node_object(class_object):
         func = partial(
             device.aggregate_for_node,
             node,
-            method.__get__(device))
+            method.__get__(device),
+            default_propagation)
         device.graph.add_rule(node, func, bind)
 
 
@@ -182,15 +183,17 @@ class logical_attribute(local_attribute):
     Args:
         bind (list of str):
             List of node names to bind to. It has to contain at least one name.
-        create_attribute (str):
+        default_propagation (optional, bool):
+            Use the default error propagation mecanism. Default is True.
+        create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
     """
 
-    def __init__(self, bind, create_attribute=True, **kwargs):
+    def __init__(self, bind, default_propagation=True, **kwargs):
         self.bind = bind
         self.method = None
-        super(logical_attribute, self).__init__(
-            create_attribute=create_attribute, **kwargs)
+        self.default_propagation = default_propagation
+        super(logical_attribute, self).__init__(**kwargs)
 
     def configure(self, device):
         super(logical_attribute, self).configure(device)
@@ -198,9 +201,11 @@ class logical_attribute(local_attribute):
         self.configure_binding(device, node)
 
     def configure_binding(self, device, node):
-        self.bind_node(device, node, self.bind, self.method)
+        self.bind_node(
+            device, node, self.bind, self.method, self.default_propagation)
 
     def connect(self, device):
+        # Override the local_attribute connect method
         pass
 
 
@@ -212,21 +217,20 @@ class proxy_attribute(logical_attribute):
     Args:
         property_name (str):
             Name of the property containing the attribute name.
-        create_property (str):
+        create_property (optional, bool):
             Create the corresponding device property. Default is True.
-        create_attribute (str):
+        default_propagation (optional, bool):
+            Use the default error propagation mecanism. Default is True.
+        create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
 
     Also supports the standard attribute keywords.
     """
 
-    def __init__(self, property_name,
-                 create_property=True, create_attribute=True,
-                 **kwargs):
+    def __init__(self, property_name, create_property=True, **kwargs):
         self.property_name = property_name
         self.create_property = create_property
-        super(proxy_attribute, self).__init__(
-            None, create_attribute=create_attribute, **kwargs)
+        super(proxy_attribute, self).__init__(None, **kwargs)
 
     def update_class(self, key, dct):
         # Parent method
@@ -276,7 +280,8 @@ class proxy_attribute(logical_attribute):
         subnode.remote_attr = attr
         device.graph.add_node(subnode)
         # Binding
-        self.bind_node(device, node, bind, self.method)
+        self.bind_node(
+            device, node, bind, self.method, self.default_propagation)
 
     def connect(self, device):
         node = device.graph[self.key]
@@ -305,9 +310,11 @@ class combined_attribute(proxy_attribute):
     Args:
         property_name (str):
             Name of the property containing the attribute names.
-        create_property (str):
+        create_property (optional, bool):
             Create the corresponding device property. Default is True.
-        create_attribute (str):
+        default_propagation (optional, bool):
+            Use the default error propagation mecanism. Default is True.
+        create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
 
     Also supports the standard attribute keywords.
@@ -362,7 +369,8 @@ class combined_attribute(proxy_attribute):
             subnode.remote_attr = attr
             device.graph.add_node(subnode)
         # Set the binding
-        self.bind_node(device, node, bind, self.method)
+        self.bind_node(
+            device, node, bind, self.method, self.default_propagation)
 
 
 # State attribute
@@ -374,11 +382,14 @@ class state_attribute(node_object):
         bind (list of str):
             List of node names to bind to, or None to disable the binding.
             Default is None.
+        default_propagation (optional, bool):
+            Use the default error propagation mecanism. Default is True.
     """
 
-    def __init__(self, bind=None):
+    def __init__(self, bind=None, default_propagation=True):
         self.bind = bind
         self.method = None
+        self.default_propagation = default_propagation
 
     def __call__(self, method):
         self.method = method
@@ -404,7 +415,8 @@ class state_attribute(node_object):
         if not self.bind and not self.method:
             return
         # Bind node
-        self.bind_node(device, node, self.bind, self.method)
+        self.bind_node(
+            device, node, self.bind, self.method, self.default_propagation)
 
 
 # Proxy command

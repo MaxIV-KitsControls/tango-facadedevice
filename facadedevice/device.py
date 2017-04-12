@@ -200,9 +200,15 @@ class Facade(_Facade):
         except Exception as exc:
             self.ignore_exception(exc)
 
-    def aggregate_for_node(self, node, func, *nodes):
+    def aggregate_for_node(self, node, func, default_propagation, *nodes):
         """Contextualize result and exception propagation."""
         with context("updating", node):
+            # Custom propagation
+            if not default_propagation:
+                result = func(*nodes)
+                if not isinstance(result, triplet):
+                    result = triplet(result)
+                return result
             # Forward first exception
             for node in nodes:
                 if node.exception() is not None:
