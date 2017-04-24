@@ -159,7 +159,6 @@ class EnhancedDevice(Device):
         self._event_dict = {}
         self._connected = False
         self._tango_properties = {}
-        self._init_ident = get_ident()
         self._init_stamp = time.time()
         self._eid_counter = itertools.count(1)
         self._exception_history = collections.defaultdict(int)
@@ -172,14 +171,18 @@ class EnhancedDevice(Device):
         self.set_state(DevState.INIT)
         # Initialize the device
         try:
+            self._init_ident = get_ident()
             self.safe_init_device()
+        # Register exception
         except Exception as exc:
             msg = "Exception while initializing the device"
             self.register_exception(exc, msg)
             self.delete_device()
             return
+        # Connection successful
         else:
             self._connected = True
+            self._init_ident = None
         # Set default state
         if self.get_state() == DevState.INIT:
             self.set_state(DevState.UNKNOWN)
@@ -202,13 +205,18 @@ class EnhancedDevice(Device):
     def _wrap_callback(self, callback, eid):
         def wrapped(event):
             # Fix libtango bug #316
-            if self.get_state() == DevState.INIT and \
+            if self._init_ident is not None and \
                self._init_ident != get_ident():
                 return  # pragma: no cover
             # Acquire monitor lock
-            with AutoTangoMonitor(self):
-                if eid in self._event_dict:
-                    callback(event)
+            try:
+                with AutoTangoMonitor(self):
+                    if eid in self._event_dict:
+                        callback(event)
+            # Register exception
+            except Exception as exc:
+                message = "Exception while running event callback {}"
+                self.ignore_exception(exc, message.format(eid))
         return wrapped
 
     def subscribe_event(self, attr_name, event_type, callback,
