@@ -17,8 +17,8 @@ def safe_read(fname):
 
 # Setup
 setup(
-    name="facadedevice",
-    version="1.0.0dev",
+    name='facadedevice',
+    version='1.0.0dev',
     packages=['facadedevice'],
 
     # Metadata
