@@ -330,7 +330,7 @@ def test_logical_attribute_with_custom_propagation(mocker):
         @logical_attribute(
             dtype=float,
             bind=['A', 'B'],
-            default_propagation=False)
+            standard_propagation=False)
         def C(self, a, b):
             return a.result().value / b.result().value
 
