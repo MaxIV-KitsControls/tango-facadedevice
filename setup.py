@@ -29,6 +29,14 @@ setup(
     url="http://www.maxlab.lu.se",
     long_description=safe_read("README.md"),
 
+    # Classifiers
+    classifiers=[
+        'Intended Audience :: Developers',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Software Development :: Libraries'],
 
     # Requirements
     install_requires=['pytango>=9.2.1'],
