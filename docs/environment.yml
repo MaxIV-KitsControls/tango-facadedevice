@@ -1,0 +1,3 @@
+name: pytango
+dependencies:
+- vxgmichel::pytango>=9.2.1
