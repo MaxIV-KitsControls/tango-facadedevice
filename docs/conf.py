@@ -1,5 +1,8 @@
+import os
+import sys
 import sphinx_rtd_theme
 
+sys.path.append(os.path.abspath('../'))
 VERSION = open('../setup.py').read().split("version='")[1].split("'")[0]
 
 project = 'facadedevice'
