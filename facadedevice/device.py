@@ -61,12 +61,35 @@ class Facade(_Facade):
     """Base class for facade devices.
 
     It supports the following objects:
-    - local_attribute
-    - logical_attribute
-    - proxy_attribute
-    - combined_attribute
-    - state_attribute
-    - proxy_command
+
+    - `facadedevice.local_attribute`_
+    - `facadedevice.logical_attribute`_
+    - `facadedevice.proxy_attribute`_
+    - `facadedevice.combined_attribute`_
+    - `facadedevice.state_attribute`_
+    - `facadedevice.proxy_command`_
+
+    It also provides a few helpers:
+
+    - `self.graph`: act as a `<key, node>` dictionnary
+    - `self.get_combined_results`: return the subresults of a combined
+      attribute
+
+    The `init_device` method shouldn't be overridden. It performs specific
+    exception handling. Instead, override `safe_init_device` if you have to
+    add some extra logic. Don't forget to call the parent method since it
+    performs a few useful steps:
+
+    - load device properties
+    - configure and build the graph
+    - run the connection routine
+
+    It also provides an expert command called `GetInfo` that displays useful
+    information such as:
+
+    - the connection status
+    - the list of all event subscriptions
+    - the exception history
     """
 
     # Reasons to ignore for errors in events
@@ -81,6 +104,10 @@ class Facade(_Facade):
     # Helper
 
     def get_combined_results(self, name):
+        """Return the subresults of a given combined attribute.
+
+        It produces an ordered dictionnary of <attribute_name, triplet>.
+        """
         subnodes = self.graph.subnodes(name)
         return collections.OrderedDict(
             (node.remote_attr, node.result()) for node in subnodes)
@@ -310,6 +337,14 @@ class Facade(_Facade):
 # Timed Facade
 
 class TimedFacade(Facade):
+    """Similar to the `facadedevice.Facade` base class with time handling.
+
+    In particular, it adds:
+
+    - the `UpdateTime` polled command, used trigger updates periodically
+    - the `Time` local attribute, a float updated at every tick
+    - the `on_time` method, a callback that runs at every tick
+    """
 
     def init_device(self):
         super(TimedFacade, self).init_device()
@@ -318,7 +353,10 @@ class TimedFacade(Facade):
     Time = local_attribute(dtype=float)
 
     @Time.notify
-    def on_time(self, node):
+    def _on_time(self, node):
+        self.on_time(node.result().value)
+
+    def on_time(self, value):
         pass
 
     @command(
