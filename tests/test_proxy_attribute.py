@@ -457,3 +457,42 @@ def test_proxy_attribute_broken_unsubscription(mocker):
         info = proxy.getinfo()
         assert "Cannot unsubscribe from attribute a/b/c/d" in info
         assert "Ooops" in info
+
+
+
+def test_exception_on_monitor_lock(mocker):
+
+    class Test(Facade):
+
+        attr = proxy_attribute(
+            dtype=float,
+            property_name='prop')
+
+    mocker.patch('facadedevice.utils.DeviceProxy')
+    inner_proxy = utils.DeviceProxy.return_value
+    inner_proxy.dev_name.return_value = 'a/b/c'
+    subscribe_event = inner_proxy.subscribe_event
+    monitor_mock = mocker.patch('facadedevice.utils.AutoTangoMonitor')
+    monitor_mock.return_value.__enter__.side_effect = RuntimeError('Ooops')
+
+    with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
+        # Device not in fault
+        assert proxy.state() == DevState.UNKNOWN
+        # Check mocks
+        utils.DeviceProxy.assert_called_with('a/b/c')
+        assert subscribe_event.called
+        cb = subscribe_event.call_args[0][2]
+        args = 'd', EventType.CHANGE_EVENT, cb, [], False
+        subscribe_event.assert_called_with(*args)
+        # Trigger events
+        event = mocker.Mock(spec=EventData)
+        event.attr_name = 'a/b/c/d'
+        event.errors = False
+        event.attr_value.value = 1.2
+        event.attr_value.time.totime.return_value = 3.4
+        event.attr_value.quality = AttrQuality.ATTR_ALARM
+        cb(event)
+        # Get info
+        info = proxy.getinfo()
+        assert 'Exception while running event callback' in info
+        assert 'Ooops' in info
