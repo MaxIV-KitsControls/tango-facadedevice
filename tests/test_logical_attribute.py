@@ -323,14 +323,14 @@ def test_logical_attribute_returning_none(mocker):
 
 
 
-def test_logical_attribute_with_custom_propagation(mocker):
+def test_logical_attribute_with_custom_aggregation(mocker):
 
     class Test(Facade):
 
         @logical_attribute(
             dtype=float,
             bind=['A', 'B'],
-            standard_propagation=False)
+            standard_aggregation=False)
         def C(self, a, b):
             return a.result().value / b.result().value
 

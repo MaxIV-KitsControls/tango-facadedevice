@@ -58,7 +58,16 @@ _Facade = FacadeMeta('_Facade', (EnhancedDevice,), {})
 # Facade device
 
 class Facade(_Facade):
-    """Provide base methods for a facade device."""
+    """Base class for facade devices.
+
+    It supports the following objects:
+    - local_attribute
+    - logical_attribute
+    - proxy_attribute
+    - combined_attribute
+    - state_attribute
+    - proxy_command
+    """
 
     # Reasons to ignore for errors in events
     reasons_to_ignore = ["API_PollThreadOutOfSync"]
@@ -76,12 +85,12 @@ class Facade(_Facade):
         return collections.OrderedDict(
             (node.remote_attr, node.result()) for node in subnodes)
 
-    def get_default_value(self, attr):
+    def _get_default_value(self, attr):
         dtype = attr.get_data_type()
         dformat = attr.get_data_format()
         return get_default_attribute_value(dformat, dtype)
 
-    def emulate_subcommand(self, result, *args):
+    def _emulate_subcommand(self, result, *args):
         if args or result is None:
             raise ValueError('This proxy command is disabled')
         return result
@@ -110,18 +119,18 @@ class Facade(_Facade):
 
     # Event subscription
 
-    def subscribe_for_node(self, attr, node):
+    def _subscribe_for_node(self, attr, node):
         try:
             self.subscribe_event(
                 attr,
                 EventType.CHANGE_EVENT,
-                lambda event: self.on_node_event(node, event))
+                lambda event: self._on_node_event(node, event))
         except DevFailed:
             try:
                 self.subscribe_event(
                     attr,
                     EventType.PERIODIC_EVENT,
-                    lambda event: self.on_node_event(node, event))
+                    lambda event: self._on_node_event(node, event))
             except DevFailed:
                 msg = "Can't subscribe to event for attribute {}"
                 self.info_stream(msg.format(attr))
@@ -137,7 +146,7 @@ class Facade(_Facade):
 
     # Event callback
 
-    def on_node_event(self, node, event):
+    def _on_node_event(self, node, event):
         """Handle node events."""
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
@@ -164,27 +173,27 @@ class Facade(_Facade):
 
     # Client requests
 
-    def read_from_node(self, node, attr=None):
+    def _read_from_node(self, node, attr=None):
         """Used when reading an attribute"""
         if node.result() is None:
             return
         value, stamp, quality = node.result()
         if attr:
             if value is None:
-                value = self.get_default_value(attr)
+                value = self._get_default_value(attr)
             attr.set_value_date_quality(value, stamp, quality)
         return value, stamp, quality
 
-    def write_to_node(self, node, value):
+    def _write_to_node(self, node, value):
         """Used when writing a local attribute"""
         node.set_result(triplet(value))
 
-    def run_proxy_command(self, key, value):
+    def _run_proxy_command(self, key, value):
         """Used when writing a proxy attribute"""
-        return self.run_proxy_command_context(
+        return self._run_proxy_command_context(
             key, lambda subcommand, value: subcommand(value), value)
 
-    def run_proxy_command_context(self, key, ctx, *values):
+    def _run_proxy_command_context(self, key, ctx, *values):
         """Used when running a proxy command"""
         # Run subcommand in context
         subcommand = self._subcommand_dict[key]
@@ -192,7 +201,7 @@ class Facade(_Facade):
 
     # Controlled callbacks
 
-    def run_callback(self, ctx, func, node):
+    def _run_callback(self, ctx, func, node):
         """Contexualize different node callbacks."""
         try:
             with context(ctx, node):
@@ -200,15 +209,9 @@ class Facade(_Facade):
         except Exception as exc:
             self.ignore_exception(exc)
 
-    def aggregate_for_node(self, node, func, standard_propagation, *nodes):
-        """Contextualize result and exception propagation."""
+    def _standard_aggregation(self, node, func, *nodes):
+        """Contextualize aggregation and propagate errors automatically."""
         with context("updating", node):
-            # Custom propagation
-            if not standard_propagation:
-                result = func(*nodes)
-                if not isinstance(result, triplet):
-                    result = triplet(result)
-                return result
             # Forward first exception
             for node in nodes:
                 if node.exception() is not None:
@@ -231,9 +234,17 @@ class Facade(_Facade):
             quality = aggregate_qualities(qualities)
             return triplet(result, max(stamps), quality)
 
+    def _custom_aggregation(self, node, func, *nodes):
+        """Contextualize aggregation."""
+        with context("updating", node):
+            result = func(*nodes)
+            if not isinstance(result, triplet):
+                result = triplet(result)
+            return result
+
     # Dedicated callbacks
 
-    def set_state_from_node(self, node):
+    def _set_state_from_node(self, node):
         # Forward exception
         if node.exception() is not None:
             self.register_exception(node.exception())
@@ -265,7 +276,7 @@ class Facade(_Facade):
         except Exception as exc:
             self.register_exception(exc)
 
-    def push_event_for_node(self, node):
+    def _push_event_for_node(self, node):
         attr = getattr(self, node.name)
         # Exception
         if node.exception() is not None:
@@ -279,7 +290,7 @@ class Facade(_Facade):
         else:
             value, stamp, quality = node.result()
             if value is None:
-                value = self.get_default_value(attr)
+                value = self._get_default_value(attr)
             self.push_change_event(node.name, value, stamp, quality)
             self.push_archive_event(node.name, value, stamp, quality)
 

@@ -56,24 +56,23 @@ class node_object(class_object):
             return
         # Add user callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device._run_callback,
             "running user callback for",
             self.callback.__get__(device)))
 
     # Binding helper
 
     @staticmethod
-    def bind_node(device, node, bind, method, standard_propagation):
+    def bind_node(device, node, bind, method, standard_aggregation=True):
         if not method:
             raise ValueError('No update method defined')
         if not bind:
             raise ValueError('No binding defined')
         # Set the binding
-        func = partial(
-            device.aggregate_for_node,
-            node,
-            method.__get__(device),
-            standard_propagation)
+        aggregate = (
+            device._standard_aggregation if standard_aggregation
+            else device._custom_aggregation)
+        func = partial(aggregate, node, method.__get__(device))
         device.graph.add_rule(node, func, bind)
 
 
@@ -120,7 +119,7 @@ class local_attribute(node_object):
         kwargs = dict(self.kwargs)
         # Read method
         kwargs['fget'] = lambda device, attr=None: \
-            device.read_from_node(device.graph[key], attr)
+            device._read_from_node(device.graph[key], attr)
         # Is allowed method
         method_name = "is_" + key + "_allowed"
         if method_name not in dct:
@@ -134,7 +133,7 @@ class local_attribute(node_object):
         # Set write method
         dct[key] = dct[key].setter(
             lambda device, value:
-                device.write_to_node(device.graph[key], value))
+                device._write_to_node(device.graph[key], value))
 
     def configure(self, device):
         # Build node
@@ -149,9 +148,9 @@ class local_attribute(node_object):
         attr.set_change_event(True, False)
         # Add push event callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device._run_callback,
             "pushing events for",
-            device.push_event_for_node))
+            device._push_event_for_node))
 
     def connect(self, device):
         if not self.method:
@@ -183,16 +182,16 @@ class logical_attribute(local_attribute):
     Args:
         bind (list of str):
             List of node names to bind to. It has to contain at least one name.
-        standard_propagation (optional, bool):
-            Use the default error propagation mecanism. Default is True.
+        standard_aggregation (optional, bool):
+            Use the default aggregation mecanism. Default is True.
         create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
     """
 
-    def __init__(self, bind, standard_propagation=True, **kwargs):
+    def __init__(self, bind, standard_aggregation=True, **kwargs):
         self.bind = bind
         self.method = None
-        self.standard_propagation = standard_propagation
+        self.standard_aggregation = standard_aggregation
         super(logical_attribute, self).__init__(**kwargs)
 
     def configure(self, device):
@@ -202,7 +201,7 @@ class logical_attribute(local_attribute):
 
     def configure_binding(self, device, node):
         self.bind_node(
-            device, node, self.bind, self.method, self.standard_propagation)
+            device, node, self.bind, self.method, self.standard_aggregation)
 
     def connect(self, device):
         # Override the local_attribute connect method
@@ -219,8 +218,8 @@ class proxy_attribute(logical_attribute):
             Name of the property containing the attribute name.
         create_property (optional, bool):
             Create the corresponding device property. Default is True.
-        standard_propagation (optional, bool):
-            Use the default error propagation mecanism. Default is True.
+        standard_aggregation (optional, bool):
+            Use the default aggregation mecanism. Default is True.
         create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
 
@@ -245,7 +244,7 @@ class proxy_attribute(logical_attribute):
         # Set write method
         dct[key] = dct[key].setter(
             lambda device, value:
-                device.run_proxy_command(
+                device._run_proxy_command(
                     key, value))
 
     def configure_binding(self, device, node):
@@ -260,7 +259,7 @@ class proxy_attribute(logical_attribute):
             node.default_value = literal_eval(attr)
             # Make subcommand
             if self.use_default_write:
-                subcommand = partial(device.write_to_node, node)
+                subcommand = partial(device._write_to_node, node)
                 device._subcommand_dict[self.key] = subcommand
             return
         # Check attribute
@@ -281,7 +280,7 @@ class proxy_attribute(logical_attribute):
         device.graph.add_node(subnode)
         # Binding
         self.bind_node(
-            device, node, bind, self.method, self.standard_propagation)
+            device, node, bind, self.method, self.standard_aggregation)
 
     def connect(self, device):
         node = device.graph[self.key]
@@ -295,7 +294,7 @@ class proxy_attribute(logical_attribute):
             subnodes = device.graph.subnodes(self.key)
         # Subscribe
         for subnode in subnodes:
-            device.subscribe_for_node(subnode.remote_attr, subnode)
+            device._subscribe_for_node(subnode.remote_attr, subnode)
 
 
 # Combined attribute
@@ -312,8 +311,8 @@ class combined_attribute(proxy_attribute):
             Name of the property containing the attribute names.
         create_property (optional, bool):
             Create the corresponding device property. Default is True.
-        standard_propagation (optional, bool):
-            Use the default error propagation mecanism. Default is True.
+        standard_aggregation (optional, bool):
+            Use the default error aggregation mecanism. Default is True.
         create_attribute (optional, bool):
             Create the corresponding tango attribute. Default is True.
 
@@ -370,7 +369,7 @@ class combined_attribute(proxy_attribute):
             device.graph.add_node(subnode)
         # Set the binding
         self.bind_node(
-            device, node, bind, self.method, self.standard_propagation)
+            device, node, bind, self.method, self.standard_aggregation)
 
 
 # State attribute
@@ -382,14 +381,14 @@ class state_attribute(node_object):
         bind (list of str):
             List of node names to bind to, or None to disable the binding.
             Default is None.
-        standard_propagation (optional, bool):
-            Use the default error propagation mecanism. Default is True.
+        standard_aggregation (optional, bool):
+            Use the default error aggregation mecanism. Default is True.
     """
 
-    def __init__(self, bind=None, standard_propagation=True):
+    def __init__(self, bind=None, standard_aggregation=True):
         self.bind = bind
         self.method = None
-        self.standard_propagation = standard_propagation
+        self.standard_aggregation = standard_aggregation
 
     def __call__(self, method):
         self.method = method
@@ -408,15 +407,15 @@ class state_attribute(node_object):
         node = device.graph[self.key]
         # Add set state callback
         node.callbacks.append(partial(
-            device.run_callback,
+            device._run_callback,
             "setting the state from",
-            device.set_state_from_node))
+            device._set_state_from_node))
         # Nothing to bind
         if not self.bind and not self.method:
             return
         # Bind node
         self.bind_node(
-            device, node, self.bind, self.method, self.standard_propagation)
+            device, node, self.bind, self.method, self.standard_aggregation)
 
 
 # Proxy command
@@ -456,7 +455,7 @@ class proxy_command(class_object):
         super(proxy_command, self).update_class(key, dct)
         # Set command
         dct[key] = lambda device, *args: \
-            device.run_proxy_command_context(
+            device._run_proxy_command_context(
                 key, self.method.__get__(device), *args)
         dct[key].__name__ = key
         dct[key] = command(**self.kwargs)(dct[key])
@@ -478,7 +477,7 @@ class proxy_command(class_object):
         # Default value
         if '/' not in name:
             value = literal_eval(name)
-            subcommand = partial(device.emulate_subcommand, value)
+            subcommand = partial(device._emulate_subcommand, value)
         # Check subcommand
         else:
             subcommand = make_subcommand(name, attr=self.write_attribute)
