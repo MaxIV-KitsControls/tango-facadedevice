@@ -1,5 +1,5 @@
 from tango.server import command
-from facadedevice import Facade, local_attribute
+from facadedevice import Facade, local_attribute, triplet
 
 
 class Counter2(Facade):
@@ -13,7 +13,7 @@ class Counter2(Facade):
     def increment(self):
         node = self.graph['count']
         value, stamp, quality = node.result()
-        new_result = (value+1,)
+        new_result = triplet(value+1)
         node.set_result(new_result)
 
 if __name__ == '__main__':
