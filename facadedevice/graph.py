@@ -121,8 +121,10 @@ class Node(object):
 class RestrictedNode(Node):
 
     def set_result(self, result):
+        if result is not None and not isinstance(result, tuple):
+            raise TypeError("Not a tuple (or None)")
         if result is not None and not isinstance(result, triplet):
-            raise TypeError("Not a triplet (or None)")
+            result = triplet(*result)
         return super(RestrictedNode, self).set_result(result)
 
 

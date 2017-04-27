@@ -364,5 +364,4 @@ class TimedFacade(Facade):
         display_level=DispLevel.EXPERT)
     def UpdateTime(self):
         t = time.time()
-        result = triplet(t, t)
-        self.graph['Time'].set_result(result)
+        self.graph['Time'].set_result((t, t))
