@@ -18,6 +18,17 @@ The library requires:
  - **pytango** >= 9.2.1
 
 
+Installation
+------------
+
+Install the library by running:
+
+```console
+$ python setup.py install # Or
+$ pip install .
+```
+
+
 Documentation
 -------------
 
