@@ -14,44 +14,36 @@ The library requires:
  - pytango >= 9.2.1
 
 
-Example
--------
+Usage
+-----
 
-The following example shows the definition of a rectangle device,
-getting its width and height from other devices:
+The facade devices support the following objects:
 
-.. sourcecode:: python
+- **local_attribute**: tango attribute holding a local value. Useful for
+configuring the device at runtime.
 
-  from facadevice import Facade, proxy_attribute, logical_attribute
+- **logical_attribute**: tango attribute computed from the values of other
+  attributes. Use it as a decorator to register the function that make this
+  computation.
 
-  class Rectangle(Facade):
+- **state_attribute**: It is used to describe the logical relationship between
+  state/status and the other attributes. It is very similar to logical attributes.
 
-      Width = proxy_attribute(
-	  property_name='WidthAttribute')
+- **proxy_attribute**: tango attribute bound to the attribute of a remote
+  device. Full attribute name is given as property. It supports the
+  standard attribute keywords. Optionally, a conversion method can be given.
 
-      Height = proxy_attribute(
-	  property_name='HeightAttribute')
+- **combined_attribute**: tango attribute computed from the values of other
+  remote attributes. Use it as a decorator to register the function that make
+  this computation. The remote attribute names are provided by a property,
+  either as a list or a pattern.
 
-      @logical_attribute(
-	  bind=['Width', 'Height'])
-      def Area(width, height):
-          return width * height
+- **proxy_command**: TANGO command to write an attribute of a remote device
+  with a given value. The full attribute name is given as a property. It
+  supports standard command keywords.
 
-   if __name__ == '__main__':
-      Rectangle.run_server()
+Moreover, the `Facade` device is fully subclassable in a standard pythonic way
+(super, calls to parent methods, etc).
 
-A rectangle device is configured using 2 device properties, e.g.:
-
-  - WidthAttribute: `geometry/point/a/x`
-  - HeightAttribute: `geometry/point/b/y`
-
-The remote attributes are expected to push either change or periodic events.
-
-A rectangle device exposes 3 float attributes:
-
-  - Width
-  - Height
-  - Area
-
-Those attributes will be updated as soon as a corresponding event is received.
-They also pushes events, allowing other high-level devices to react to their changes.
+The `TimedFacade` class already implement a `Time` attribute that can be used
+to run periodic update (by binding to a logical attribute).

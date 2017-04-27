@@ -28,6 +28,6 @@ A descritive interface for reactive high-level Tango devices.
    :maxdepth: 2
 
    presentation
+   examples
    advanced
    reference
-   examples
