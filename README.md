@@ -14,28 +14,20 @@ Requirements
 
 The library requires:
 
- - python >= 2.7 or >= 3.4
- - pytango >= 9.2.1
-
-Generating the documentation requires:
-
- - sphinx
- - sphinx.ext.autodoc
- - sphinx.ext.napoleon
-
-The unit-tests require:
-
- - pytest
- - pytest-runner
- - pytest-mock
- - pytest-xdist
- - pytest-coverage
+ - **python** >= 2.7 or >= 3.4
+ - **pytango** >= 9.2.1
 
 
 Documentation
 -------------
 
 The documentation is hosted on [ReadTheDocs][1].
+
+Generating the documentation requires:
+
+ - sphinx
+ - sphinx.ext.autodoc
+ - sphinx.ext.napoleon
 
 Build the documentation using:
 
@@ -55,6 +47,14 @@ Run the tests using:
 ```console
 $ python setup.py test
 ```
+
+The following libraries will be downloaded if necessary:
+
+ - pytest
+ - pytest-runner
+ - pytest-mock
+ - pytest-xdist
+ - pytest-coverage
 
 
 Contact
