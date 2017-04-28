@@ -1,7 +1,7 @@
 Tutorial
 ========
 
-This tutorial goes through most of library features by presenting several
+This tutorial goes through most of the library features by presenting several
 facade devices with increasing complexity.
 
 Creating an running a facade device
@@ -195,14 +195,12 @@ Note that the return value of the `C` method can be:
 - a `triplet` result, in order to set the timestamp and/or the quality
 
 
-Triplet
--------
+The triplet structure
+---------------------
 
 The triplet is a named tuple provided by the facade device. All the node
 results are guaranteed to be a triplet when they exist. This is how it is
-used:
-
-.. sourcecode:: python
+used::
 
   from time import time
   from tango import AttrQuality
@@ -266,9 +264,7 @@ could be:
 
 Those remote attributes are expected to push either change or periodic events.
 Facade devices have an expert command called `GetInfo` that provides extra
-information about the event subscription, e.g:
-
-.. sourcecode:: console
+information about the event subscription, e.g::
 
   In [2]: print(d.getinfo())
   The device is currently connected.
@@ -297,9 +293,8 @@ exist:
 
 .. sourcecode:: console
 
-  $ python -m tango.test_context \
-  --prop "{'AAttribute': 1.0, 'BAttribute': 4.0}" division2.Division2
-  Can't create notifd event supplier. Notifd event not available
+  $ python -m tango.test_context --prop "{'AAttribute': 1.0, 'BAttribute': 4.0}" \
+    division2.Division2
   Ready to accept request
   Division2 started on port 8888 with properties {'AAttribute': 1.0, 'BAttribute': 4.0}
   Device access: tango://vinmic-t440p:8888/test/nodb/division2#dbase=no
@@ -311,3 +306,39 @@ Let's check the values::
   In [3]: d.B = 4
   In [4]: d.C
   Out[4]: 0.25
+
+
+Combined attributes
+-------------------
+
+In some cases, it is interesting to access remote attributes in a more dynamic
+way. The `facadedevice` library does not support dymanic attributes directly,
+but it provides a `combined_attributes` object that can be used for similar
+purposes. Let's say we'd like to compute the average of the values of an
+arbitrary list of attributes:
+
+.. literalinclude:: ../examples/average.py
+   :pyobject: Average
+
+Here, the `AttributesToAverage` device property is simply the list of all the
+attributes that should be used for the computation. The attributes may come
+from the same device, or different devices. If that device property is a single
+line, it's used a pattern for listing the attributes. For instance, the pattern
+`a/b/*/x[12]` might yield:
+
+- a/b/c/x1
+- a/b/c/x2
+- a/b/whatever/x1
+- a/b/whatever/x2
+- etc.
+
+
+It includes all the attributes called `x1` or `x2` from any device starting
+with `a/b/`. Note that the aggregation works the same as for logical
+attributes.
+
+
+Proxy commands
+--------------
+
+# TODO
