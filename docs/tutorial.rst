@@ -213,10 +213,10 @@ used::
   result = triplet(1., stamp=time())
 
   # A triplet from a value and a quality
-  result = triplet(1, quality=AttrQuality.ALARM)
+  result = triplet(1, quality=AttrQuality.ATTR_ALARM)
 
   # A triplet from value, a stamp and a quality
-  result = triplet(1, time(), AttrQuality.CHANGING)
+  result = triplet(1, time(), AttrQuality.ATTR_CHANGING)
 
   # Triplets can be unpacked
   value, stamp, quality = result
