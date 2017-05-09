@@ -16,7 +16,7 @@ def traceback_string(exc, limit=None):
         return ''.join(traceback.format_tb(exc.__traceback__, limit=limit))
     if any(sys.exc_info()):
         return traceback.format_exc(limit=limit)
-    return "No traceback."
+    return ''
 
 
 # Safe exception representation

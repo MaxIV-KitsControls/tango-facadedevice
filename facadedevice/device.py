@@ -238,36 +238,47 @@ class Facade(_Facade):
 
     def _standard_aggregation(self, node, func, *nodes):
         """Contextualize aggregation and propagate errors automatically."""
-        with context("updating", node):
-            # Forward first exception
-            for node in nodes:
-                if node.exception() is not None:
-                    raise node.exception()
-            # Shortcut for empty nodes
-            results = [node.result() for node in nodes]
-            if any(result is None for result in results):
-                return
-            # Exctract values
-            values, stamps, qualities = zip(*results)
-            # Invalid quality
-            if any(quality == INVALID for quality in qualities):
-                return triplet(None, max(stamps), INVALID)
-            # Run function
-            result = func(*values)
-            # Return triplet
-            if isinstance(result, triplet):
-                return result
-            # Create triplet
-            quality = aggregate_qualities(qualities)
-            return triplet(result, max(stamps), quality)
+        # Forward first exception
+        for subnode in nodes:
+            if subnode.exception() is not None:
+                with context("updating", node):
+                    raise subnode.exception()
+        # Shortcut for empty nodes
+        results = [subnode.result() for subnode in nodes]
+        if any(result is None for result in results):
+            return
+        # Exctract values
+        values, stamps, qualities = zip(*results)
+        # Invalid quality
+        if any(quality == INVALID for quality in qualities):
+            return triplet(None, max(stamps), INVALID)
+        # Run function
+        try:
+            with context("updating", node):
+                result = func(*values)
+        except Exception as exc:
+            self.ignore_exception(exc)
+            raise exc
+        # Return triplet
+        if isinstance(result, triplet):
+            return result
+        # Create triplet
+        quality = aggregate_qualities(qualities)
+        return triplet(result, max(stamps), quality)
 
     def _custom_aggregation(self, node, func, *nodes):
         """Contextualize aggregation."""
-        with context("updating", node):
-            result = func(*nodes)
-            if not isinstance(result, triplet):
-                result = triplet(result)
-            return result
+        # Run function
+        try:
+            with context("updating", node):
+                result = func(*nodes)
+        except Exception as exc:
+            self.ignore_exception(exc)
+            raise exc
+        # Return result
+        if not isinstance(result, triplet):
+            result = triplet(result)
+        return result
 
     # Dedicated callbacks
 
@@ -310,6 +321,9 @@ class Facade(_Facade):
             exception = to_dev_failed(node.exception())
             self.push_change_event(node.name, exception)
             self.push_archive_event(node.name, exception)
+            # Log the pushing of exceptions
+            msg = 'Pushing an exception for attribute {}'
+            self.debug_exception(exception, msg.format(node.name))
         # Empty result
         elif node.result() is None:
             pass

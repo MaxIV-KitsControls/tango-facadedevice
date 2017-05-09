@@ -128,7 +128,7 @@ class EnhancedDevice(Device):
 
     def register_exception(self, exc, msg=None, ignore=False):
         # Stream traceback
-        self.debug_stream(traceback_string(exc).replace("%", "%%"))
+        self.debug_stream(traceback_string(exc).replace('%', '%%'))
         # Exception as a string
         status = exception_string(exc, wrap=msg)
         # Stream error
@@ -142,8 +142,12 @@ class EnhancedDevice(Device):
         # Return exception status
         return status
 
-    def ignore_exception(self, exc, msg=''):
+    def ignore_exception(self, exc, msg=None):
         return self.register_exception(exc, msg=msg, ignore=True)
+
+    def debug_exception(self, exc, msg=None):
+        string = exception_string(exc, wrap=msg)
+        self.debug_exception(string.replace('%', '%%'))
 
     # Initialization and cleanup
 
@@ -195,7 +199,7 @@ class EnhancedDevice(Device):
         try:
             self.unsubscribe_all()
         except Exception as exc:
-            msg = "Error while unsubscribing"
+            msg = "Exception while unsubscribing"
             return self.ignore_exception(exc, msg)
         # Parent call
         super(Device, self).delete_device()
@@ -252,11 +256,11 @@ class EnhancedDevice(Device):
             try:
                 self.unsubscribe_event(eid)
             except Exception as exc:
-                msg = "Cannot unsubscribe from attribute {}"
+                msg = "Exception while unsubscribing from attribute {}"
                 msg = msg.format(attr_name)
                 self.ignore_exception(exc, msg)
             else:
-                msg = "Successfully Unsubscribed from attribute {}"
+                msg = "Successfully unsubscribed from attribute {}"
                 msg = msg.format(attr_name)
                 self.info_stream(msg)
 
