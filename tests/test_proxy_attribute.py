@@ -455,9 +455,8 @@ def test_proxy_attribute_broken_unsubscription(mocker):
         proxy.delete()
         # Check info
         info = proxy.getinfo()
-        assert "Cannot unsubscribe from attribute a/b/c/d" in info
+        assert "Exception while unsubscribing from attribute a/b/c/d" in info
         assert "Ooops" in info
-
 
 
 def test_exception_on_monitor_lock(mocker):
