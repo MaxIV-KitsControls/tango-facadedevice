@@ -147,7 +147,7 @@ class EnhancedDevice(Device):
 
     def debug_exception(self, exc, msg=None):
         string = exception_string(exc, wrap=msg)
-        self.debug_exception(string.replace('%', '%%'))
+        self.debug_stream(string.replace('%', '%%'))
 
     # Initialization and cleanup
 
