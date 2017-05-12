@@ -1,4 +1,4 @@
 name: pytango
 dependencies:
-- vxgmichel::pytango>=9.2.1
+- tango-controls::pytango>=9.2.1
 - sphinx>1.5
