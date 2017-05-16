@@ -270,15 +270,17 @@ class EnhancedDevice(Device):
         super(Device, self).set_state(state)
         if stamp is None:
             stamp = time.time()
-        self.push_change_event('State', state, stamp, quality)
-        self.push_archive_event('State', state, stamp, quality)
+        # Pushing specific values for events on state attribute doesn't work
+        self.push_change_event('State')  # ... state, stamp, quality)
+        self.push_archive_event('State')  # ... state, stamp, quality)
 
     def set_status(self, status, stamp=None, quality=AttrQuality.ATTR_VALID):
         super(Device, self).set_status(status)
         if stamp is None:
             stamp = time.time()
-        self.push_change_event('Status', status, stamp, quality)
-        self.push_archive_event('Status', status, stamp, quality)
+        # Pushing specific values for events on status attribute doesn't work
+        self.push_change_event('Status')  # ... state, stamp, quality)
+        self.push_archive_event('Status')  # ... state, stamp, quality)
 
     # Commands
 
