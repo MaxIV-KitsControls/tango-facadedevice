@@ -30,5 +30,6 @@ A descritive interface for reactive high-level Tango devices.
    presentation
    tutorial
    advanced
+   limitations
    reference
    examples
