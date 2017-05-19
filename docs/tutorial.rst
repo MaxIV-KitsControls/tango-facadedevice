@@ -341,4 +341,33 @@ attributes.
 Proxy commands
 --------------
 
-# TODO
+The library also provides an interface for proxy attributes, although it doesn't
+use of the concepts explained earlier (graph, node, triplets, etc.). It's simply a
+helper to bind a tango command to a command on a remote device. Consider the
+following example:
+
+.. literalinclude:: ../examples/commands.py
+   :pyobject: Commands
+
+The `reset` command here simply delegates to the `ResetCommand` provided in the
+device properties. It has no input argument, no return value, and the remote
+command is expected to have the same interface.
+
+The `echo` command delegates to the `EchoCommand` provided in the device properties
+by passing the input string argument to the remote command and returning its
+return value. Again, both interfaces are expected to match (otherwise an exception
+will be raised at runtime).
+
+It is also possible to write a remote attribute instead of running a remote command.
+The `set_level` command does exactly that by setting `write_attribute=True`. Note
+that value to write is directly given by the float input argument.
+
+In some cases, we need a finer control over the command behavior. For instance, we
+might need to apply some conversion before or after running the remote command. It
+is then possible to use `proxy_command` as a decorator of a method implementing this
+extra bit of logic.
+
+The `identity` command in the code above is one example of that:
+the remote command can only handle string, while we'd like our command to work with
+integers. See how the `identity` method receives the remote command and the input
+argument, and how it converts the different values to make the types match.
