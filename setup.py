@@ -8,12 +8,15 @@ from setuptools import setup
 TESTING = any(x in sys.argv for x in ['test', 'pytest'])
 
 
-# Read function
-def safe_read(fname):
-    try:
-        return open(fname).read()
-    except IOError:
-        return ""
+# README helper
+def get_readme(name='README.rst'):
+    """Get readme file contents without the badges."""
+    with open(name) as f:
+        return '\n'.join(
+            line for line in f.read().splitlines()
+            if not line.startswith('|')
+            or not line.endswith('|'))
+
 
 # Setup
 setup(
@@ -22,12 +25,14 @@ setup(
     packages=['facadedevice'],
 
     # Metadata
-    description="Provide a facade device to subclass.",
+    description=(
+        "Provide a descriptive interface for "
+        "reactive high-level Tango devices."),
     author="Vincent Michel",
-    author_email="vincent.michel@maxlab.lu.se",
+    author_email="vincent.michel@esrf.fr",
     license="GPLv3",
-    url="http://www.maxlab.lu.se",
-    long_description=safe_read("README.md"),
+    url="https://github.com/MaxIV-KitsControls/tango-facadedevice",
+    long_description=get_readme(),
 
     # Classifiers
     classifiers=[
