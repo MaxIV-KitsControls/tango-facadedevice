@@ -1,5 +1,3 @@
-"""Provide objects for building reactive graphs."""
-
 # Imports
 
 import time
@@ -7,8 +5,32 @@ import warnings
 from functools import partial
 from collections import Mapping, namedtuple, defaultdict
 
-from numpy import array_equal
+
 from tango import AttrQuality
+
+
+def patched_array_equal(a1, a2):
+    from numpy import asarray
+    try:
+        a1, a2 = asarray(a1), asarray(a2)
+    except Exception:
+        return False
+    if a1.shape != a2.shape:
+        return False
+    return bool(asarray(a1 == a2).all())
+
+
+def check_numpy_version():
+    from numpy.version import version as numpy_version
+    import distutils.version
+    if distutils.version.StrictVersion(numpy_version) < "1.8":
+        return patched_array_equal
+    else:
+        from numpy import array_equal
+        return array_equal
+
+
+array_equal = check_numpy_version()
 
 # Constants
 

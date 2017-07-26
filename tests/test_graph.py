@@ -25,6 +25,8 @@ def test_compare_triplet():
     assert a != 1 != b
     assert a != 'test' != b
     assert a != 'tes' != b
+    h = triplet(['test'], 0.0, VALID)
+    assert h == h
 
 
 def test_triplet_constructor():
