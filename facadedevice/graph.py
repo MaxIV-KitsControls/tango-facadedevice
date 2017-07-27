@@ -1,3 +1,5 @@
+"""Provide objects for building reactive graphs."""
+
 # Imports
 
 import time
