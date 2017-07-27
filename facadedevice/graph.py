@@ -7,6 +7,7 @@ from collections import Mapping, namedtuple, defaultdict
 
 
 from tango import AttrQuality
+from numpy.version import version as numpy_version
 
 
 def patched_array_equal(a1, a2):
@@ -21,7 +22,6 @@ def patched_array_equal(a1, a2):
 
 
 def check_numpy_version():
-    from numpy.version import version as numpy_version
     import distutils.version
     if distutils.version.StrictVersion(numpy_version) < "1.8":
         return patched_array_equal
