@@ -2,7 +2,6 @@
 # Imports
 import numpy
 import pytest
-from mock import MagicMock
 
 # Facade imports
 from facadedevice.graph import Node, RestrictedNode, Graph, triplet
@@ -10,11 +9,11 @@ from facadedevice.graph import VALID, INVALID
 from facadedevice.graph import patched_array_equal
 
 
-def test_patched_array_equal():
+def test_patched_array_equal(mocker):
     assert patched_array_equal([1], [1])
     assert not patched_array_equal([1], [2])
     assert not patched_array_equal([1, 2], [1])
-    asarray_mock = MagicMock()
+    asarray_mock = mocker.Mock()
     asarray_mock.shape
     asarray_mock.side_effect = Exception()
     numpy.asarray = asarray_mock
