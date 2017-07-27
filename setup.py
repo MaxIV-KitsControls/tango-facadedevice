@@ -44,7 +44,7 @@ setup(
         'Topic :: Software Development :: Libraries'],
 
     # Requirements
-    install_requires=['pytango>=9.2.1, numpy'],
+    install_requires=['pytango>=9.2.1', 'numpy'],
     tests_require=['pytest-mock',
                    'pytest-xdist',
                    'pytest-coverage',
