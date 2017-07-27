@@ -48,6 +48,6 @@ setup(
     tests_require=['pytest-mock',
                    'pytest-xdist',
                    'pytest-coverage',
-                   'numpy>=1.0.8'],
+                   'numpy>=1.8.0'],
     setup_requires=['pytest-runner'] if TESTING else [],
 )
