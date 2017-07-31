@@ -6,9 +6,31 @@ import pytest
 # Facade imports
 from facadedevice.graph import Node, RestrictedNode, Graph, triplet
 from facadedevice.graph import VALID, INVALID
+from facadedevice.graph import patched_array_equal
 
 
-def test_compare_triplet():
+def test_patched_array_equal(mocker):
+    assert patched_array_equal([1], [1])
+    assert not patched_array_equal([1], [2])
+    assert not patched_array_equal([1, 2], [1])
+    asarray_mock = mocker.Mock()
+    asarray_mock.shape
+    asarray_mock.side_effect = Exception()
+    numpy.asarray = asarray_mock
+    assert not patched_array_equal([123], [123])
+
+
+@pytest.fixture(params=[numpy.version.version, "1.7.1", "1.8.0"])
+def numpy_version(request):
+    return request.param
+
+
+def test_compare_triplet(numpy_version):
+    # Mock numpy version
+    from facadedevice import graph
+    graph.numpy_version = numpy_version
+    # Reload array_equal
+    graph.array_equal = graph.check_numpy_version()
     a = triplet([1, 2], 0.0)
     b = triplet(numpy.array([1, 2]), 0.0)
     assert a == b == a == ([1, 2], 0.0, VALID) == b
@@ -25,6 +47,8 @@ def test_compare_triplet():
     assert a != 1 != b
     assert a != 'test' != b
     assert a != 'tes' != b
+    h = triplet(['test'], 0.0, VALID)
+    assert h == h
 
 
 def test_triplet_constructor():
