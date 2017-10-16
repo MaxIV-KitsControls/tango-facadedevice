@@ -78,10 +78,12 @@ def check_attribute(name, writable=False):
 
 # Attribute from wildcard
 
-def attributes_from_wildcard(wildcard):
+def attributes_from_wildcard(wildcard, exclude=[]):
     db = Database()
     wdev, wattr = split_tango_name(wildcard)
-    for device in db.get_device_exported(wdev):
+    devices = [d for d in db.get_device_exported(wdev)
+               if d.lower() not in exclude]
+    for device in devices:
         proxy = create_device_proxy(device)
         infos = proxy.attribute_list_query()
         attrs = sorted(info.name.lower() for info in infos)
