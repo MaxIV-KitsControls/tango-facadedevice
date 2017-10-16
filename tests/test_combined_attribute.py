@@ -148,7 +148,8 @@ def test_combined_attribute_with_wildcard(mocker):
 
         @combined_attribute(
             dtype=float,
-            property_name='prop')
+            property_name='prop',
+            exclude_property='exclude')
         def attr(self, *values):
             return sum(values)
 
@@ -157,14 +158,15 @@ def test_combined_attribute_with_wildcard(mocker):
     mocker.patch('facadedevice.utils.DeviceProxy')
     mocker.patch('facadedevice.utils.Database')
     get_device_exported = utils.Database.return_value.get_device_exported
-    get_device_exported.return_value = ['a/b/c', 'a/b/d', 'a/b/e']
+    get_device_exported.return_value = ['a/b/c', 'a/b/d', 'a/b/e', 'a/b/f']
     inner_proxy = utils.DeviceProxy.return_value
     inner_proxy.dev_name.return_value = 'a/b/c'
     infos = [named(name) for name in 'xyz']
     inner_proxy.attribute_list_query.return_value = infos
     subscribe_event = inner_proxy.subscribe_event
 
-    props = {'prop': ['a/b/*/z']}
+    props = {'prop': ['a/b/*/z'],
+             'exclude': ['a/b/f']}
 
     with DeviceTestContext(Test, properties=props) as proxy:
         # Device not in fault
@@ -173,6 +175,7 @@ def test_combined_attribute_with_wildcard(mocker):
         utils.DeviceProxy.assert_any_call('a/b/c')
         utils.DeviceProxy.assert_any_call('a/b/d')
         utils.DeviceProxy.assert_any_call('a/b/e')
+        assert 'a/b/f' not in utils.DeviceProxy.call_args_list
         assert subscribe_event.called
         cbs = [x[0][2] for x in subscribe_event.call_args_list]
         for attr, cb in zip('zzz', cbs):

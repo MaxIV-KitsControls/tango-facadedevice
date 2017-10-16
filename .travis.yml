@@ -30,7 +30,7 @@ before_install:
 
 install:
   # Install build dependencies
-  - conda install --yes -c tango-controls pytango=9.2.1
+  - conda install --yes -c esrf-bcu pytango=9.2.2
   - conda install --yes numpy  # Not a strong requirement yet
   # Install coveralls
   - pip install coveralls

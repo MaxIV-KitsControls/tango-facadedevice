@@ -319,6 +319,10 @@ class combined_attribute(proxy_attribute):
     Also supports the standard attribute keywords.
     """
 
+    def __init__(self, exclude_property="", **kwargs):
+        super(combined_attribute, self).__init__(**kwargs)
+        self.exclude_property = exclude_property
+
     def update_class(self, key, dct):
         # Parent method
         super(combined_attribute, self).update_class(key, dct)
@@ -329,10 +333,18 @@ class combined_attribute(proxy_attribute):
         if self.create_property:
             doc = "Attributes to be combined as {}.".format(key)
             dct[self.property_name] = device_property(dtype=(str,), doc=doc)
+            if self.exclude_property:
+                doc = "Attributes to exclude from wildcard output"
+                prop = device_property(dtype=(str,), doc=doc)
+                dct[self.exclude_property] = prop
 
     def configure_binding(self, device, node):
         # Strip property
         attrs = getattr(device, self.property_name)
+        try:
+            exclude = getattr(device, self.exclude_property)
+        except AttributeError:
+            exclude = []
         if not isinstance(attrs, str):
             attrs = '\n'.join(attrs)
         attrs = attrs.strip()
@@ -350,7 +362,11 @@ class combined_attribute(proxy_attribute):
         # Pattern matching
         if len(attrs) == 1:
             wildcard = attrs[0]
-            attrs = list(attributes_from_wildcard(wildcard))
+            if len(exclude) == 1:
+                exclude = exclude[0]
+            else:
+                exclude = []
+            attrs = list(attributes_from_wildcard(wildcard, exclude=exclude))
             if not attrs:
                 msg = 'No attributes matching {} wildcard'
                 raise ValueError(msg.format(wildcard))
