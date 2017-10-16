@@ -21,7 +21,7 @@ def get_readme(name='README.rst'):
 # Setup
 setup(
     name='facadedevice',
-    version='1.0.2.dev1',
+    version='1.0.2.dev2',
     packages=['facadedevice'],
 
     # Metadata
