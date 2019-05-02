@@ -21,7 +21,7 @@ def get_readme(name='README.rst'):
 # Setup
 setup(
     name='facadedevice',
-    version='1.0.2.dev1',
+    version='1.0.3.dev1',
     packages=['facadedevice'],
 
     # Metadata
@@ -40,11 +40,12 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Libraries'],
 
     # Requirements
-    install_requires=['pytango>=9.2.1', 'numpy'],
+    install_requires=['pytango>=9.3.0', 'numpy'],
     tests_require=['pytest-mock',
                    'pytest-xdist',
                    'pytest-coverage',
