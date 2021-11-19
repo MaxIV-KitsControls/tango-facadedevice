@@ -13,6 +13,9 @@ from facadedevice.graph import RestrictedNode, triplet
 from facadedevice.utils import attributes_from_wildcard
 from facadedevice.utils import check_attribute, make_subcommand
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 # Base class object
 
@@ -144,6 +147,7 @@ class local_attribute(node_object):
             return
         # Configure events
         attr = getattr(device, self.key)
+        logger.info("device is a %s, key is %s, attr is a %s" % (type(device).__name__, str(self.key), type(attr).__name__))
         attr.set_archive_event(True, True)
         attr.set_change_event(True, False)
         # Add push event callback

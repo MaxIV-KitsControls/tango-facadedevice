@@ -1,0 +1,15 @@
+# Welcome to 'semver'. The mainiac to help you keep track of versions all across
+# your project. The version must be specified with four parts in the following
+# format: <major>.<minor>.<patch>-<build>. However, all parts must not be
+# present in each place. Use the Golang template rules to tell how you want the
+# version to be present in each file.
+#
+# Link for more info: https://gitlab.maxiv.lu.se/emiros/app-maxiv-semver
+
+version: 1.0.4-1
+files:
+- path: semver.yml
+  pattern: 'version: {{.Major}}.{{.Minor}}.{{.Patch}}'
+
+- path: setup.py
+  pattern: "version='{{.Major}}.{{.Minor}}.{{.Patch}}'"

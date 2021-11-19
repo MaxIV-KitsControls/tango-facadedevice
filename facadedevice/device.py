@@ -3,6 +3,7 @@
 # Imports
 import time
 import collections
+import json
 
 # Graph imports
 from facadedevice.graph import triplet, Graph, INVALID
@@ -20,6 +21,9 @@ from facadedevice.objects import class_object, local_attribute
 # Tango imports
 from tango.server import command
 from tango import DevFailed, DevState, EventData, EventType, DispLevel
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 # Proxy metaclass
@@ -133,7 +137,10 @@ class Facade(_Facade):
         with context('getting', 'properties'):
             super(Facade, self).safe_init_device()
         # Configure
-        for value in self._class_dict.values():
+        logger.info("self._class_dict is a %s" % (type(self._class_dict).__name__))
+        logger.info("self._class_dict keys are %s" % (str(list(self._class_dict.keys()))))
+        for key, value in self._class_dict.items():
+            logger.info("self._class_dict[%s] is a %s" % (key, type(value).__name__))
             with context('configuring', value):
                 value.configure(self)
         # Build graph
@@ -160,15 +167,15 @@ class Facade(_Facade):
                     lambda event: self._on_node_event(node, event))
             except DevFailed:
                 msg = "Can't subscribe to event for attribute {}"
-                self.info_stream(msg.format(attr))
+                logger.info(msg.format(attr))
                 raise
             else:
                 msg = "Subscribed to periodic event for attribute {}"
-                self.info_stream(msg.format(attr))
+                logger.info(msg.format(attr))
                 return EventType.PERIODIC_EVENT
         else:
             msg = "Subscribed to change event for attribute {}"
-            self.info_stream(msg.format(attr))
+            logger.info(msg.format(attr))
             return EventType.CHANGE_EVENT
 
     # Event callback
@@ -178,7 +185,7 @@ class Facade(_Facade):
         # Ignore the event if not a data event
         if not isinstance(event, EventData):
             msg = "Received an unexpected event for {}"
-            self.error_stream(msg.format(node))
+            logger.error(msg.format(node))
             return
         # Format attribute name
         attr_name = '/'.join(event.attr_name.split('/')[-4:])
@@ -193,7 +200,7 @@ class Facade(_Facade):
             return
         # Info stream
         msg = "Received a valid event from {} for {}."
-        self.info_stream(msg.format(attr_name, node))
+        logger.info(msg.format(attr_name, node))
         # Save
         value = triplet.from_attr_value(event.attr_value)
         node.set_result(value)
