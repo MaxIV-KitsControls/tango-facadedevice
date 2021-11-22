@@ -137,10 +137,7 @@ class Facade(_Facade):
         with context('getting', 'properties'):
             super(Facade, self).safe_init_device()
         # Configure
-        logger.info("self._class_dict is a %s" % (type(self._class_dict).__name__))
-        logger.info("self._class_dict keys are %s" % (str(list(self._class_dict.keys()))))
         for key, value in self._class_dict.items():
-            logger.info("self._class_dict[%s] is a %s" % (key, type(value).__name__))
             with context('configuring', value):
                 value.configure(self)
         # Build graph

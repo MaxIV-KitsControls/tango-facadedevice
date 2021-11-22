@@ -6,7 +6,7 @@
 #
 # Link for more info: https://gitlab.maxiv.lu.se/emiros/app-maxiv-semver
 
-version: 1.0.4-1
+version: 1.0.5-1
 files:
 - path: semver.yml
   pattern: 'version: {{.Major}}.{{.Minor}}.{{.Patch}}'
