@@ -5,6 +5,9 @@ from setuptools import setup
 setup(
     name="facadedevice",
     packages=["facadedevice"],
+    # SCM versioning
+    use_scm_version=True,
+    setup_requires=["setuptools_scm"],
     # Metadata
     description=(
         "Provide a descriptive interface for "
@@ -20,18 +23,12 @@ setup(
     # Classifiers
     classifiers=[
         "Intended Audience :: Developers",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering",
         "Topic :: Software Development :: Libraries",
     ],
     # Requirements
     install_requires=["pytango>=9.2.1", "numpy"],
-    tests_require=[
-        "pytest-mock",
-        "pytest-xdist",
-        "pytest-coverage",
-        "numpy>=1.8.0",
-    ],
 )
