@@ -3,6 +3,7 @@
 # Imports
 import time
 import pytest
+from unittest.mock import Mock
 
 from tango.server import command
 from tango.test_context import DeviceTestContext
@@ -17,7 +18,7 @@ from facadedevice import local_attribute
 from test_simple import event_mock
 
 
-def test_local_attribute(mocker):
+def test_local_attribute():
     class Test(Facade):
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -26,12 +27,12 @@ def test_local_attribute(mocker):
         def on_a(self, node):
             on_a_mock(*node.result())
 
-    change_events, archive_events = event_mock(mocker, Test)
+    change_events, archive_events = event_mock(Mock, Test)
 
-    time.time
-    mocker.patch("time.time").return_value = 1.0
+    time.time = Mock()
+    time.time.return_value = 1.0
 
-    on_a_mock = mocker.Mock()
+    on_a_mock = Mock()
 
     with DeviceTestContext(Test) as proxy:
         # Test
@@ -48,7 +49,7 @@ def test_local_attribute(mocker):
         on_a_mock.assert_called_once_with(*expected)
 
 
-def test_local_attribute_callback_error(mocker):
+def test_local_attribute_callback_error():
     class Test(Facade):
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -57,8 +58,9 @@ def test_local_attribute_callback_error(mocker):
         def on_a(self, node):
             raise RuntimeError("Ooops")
 
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test
@@ -74,7 +76,7 @@ def test_local_attribute_callback_error(mocker):
         assert "  Ooops" in info
 
 
-def test_local_attribute_empty_push(mocker):
+def test_local_attribute_empty_push():
     class Test(Facade):
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -83,8 +85,9 @@ def test_local_attribute_empty_push(mocker):
         def reset(self):
             self.graph["A"].set_result(None)
 
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test
@@ -104,7 +107,7 @@ def test_local_attribute_empty_push(mocker):
         assert "No errors in history" in info
 
 
-def test_local_attribute_non_exposed(mocker):
+def test_local_attribute_non_exposed():
     class Test(Facade):
 
         A = local_attribute(create_attribute=False)
@@ -118,9 +121,10 @@ def test_local_attribute_non_exposed(mocker):
             result = triplet(value, time.time())
             self.graph["A"].set_result(result)
 
-    mocker.patch("time.time").return_value = 1.0
+    time.time = Mock()
+    time.time.return_value = 1.0
 
-    on_a_mock = mocker.Mock()
+    on_a_mock = Mock()
 
     with DeviceTestContext(Test) as proxy:
         # Test
@@ -133,7 +137,7 @@ def test_local_attribute_non_exposed(mocker):
         on_a_mock.assert_called_once_with(*expected)
 
 
-def test_invalid_local_attribute(mocker):
+def test_invalid_local_attribute():
 
     with pytest.raises(ValueError) as context:
 
@@ -144,7 +148,7 @@ def test_invalid_local_attribute(mocker):
     assert "Attribute creation is disabled" in str(context.value)
 
 
-def test_local_attribute_with_default_value(mocker):
+def test_local_attribute_with_default_value():
     class Test(Facade):
         @local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
         def A(self):
@@ -154,12 +158,12 @@ def test_local_attribute_with_default_value(mocker):
         def on_a(self, node):
             on_a_mock(*node.result())
 
-    change_events, archive_events = event_mock(mocker, Test)
+    change_events, archive_events = event_mock(Mock, Test)
 
-    time.time
-    mocker.patch("time.time").return_value = 1.0
+    time.time = Mock()
+    time.time.return_value = 1.0
 
-    on_a_mock = mocker.Mock()
+    on_a_mock = Mock()
 
     with DeviceTestContext(Test) as proxy:
         # First test
@@ -186,7 +190,7 @@ def test_local_attribute_with_default_value(mocker):
         on_a_mock.assert_called_once_with(*expected)
 
 
-def test_local_attribute_with_default_exception(mocker):
+def test_local_attribute_with_default_exception():
     class Test(Facade):
         @local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
         def A(self):
@@ -196,12 +200,12 @@ def test_local_attribute_with_default_exception(mocker):
         def on_a(self, node):
             on_a_mock(*node.result())
 
-    change_events, archive_events = event_mock(mocker, Test)
+    change_events, archive_events = event_mock(Mock, Test)
 
-    time.time
-    mocker.patch("time.time").return_value = 1.0
+    time.time = Mock()
+    time.time.return_value = 1.0
 
-    on_a_mock = mocker.Mock()
+    on_a_mock = Mock()
 
     with DeviceTestContext(Test) as proxy:
         # First test

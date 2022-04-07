@@ -1,7 +1,7 @@
 # Imports
 import numpy
 import pytest
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 # Facade imports
 from facadedevice.graph import Node, RestrictedNode, Graph, triplet
@@ -13,23 +13,15 @@ def test_patched_array_equal():
     assert patched_array_equal([1], [1])
     assert not patched_array_equal([1], [2])
     assert not patched_array_equal([1, 2], [1])
-    asarray_mock = Mock
-    asarray_mock.shape
-    asarray_mock.side_effect = Exception()
-    numpy.asarray = asarray_mock
-    assert not patched_array_equal([123], [123])
+    with patch("numpy.asarray") as asarray_mock:
+        asarray_mock.side_effect = RuntimeError("asarray fails")
+        assert not patched_array_equal([123], [123])
 
 
-@pytest.fixture(params=[numpy.version.version, "1.7.1", "1.8.0"])
-def numpy_version(request):
-    return request.param
-
-
-def test_compare_triplet(numpy_version):
+def test_compare_triplet():
     # Mock numpy version
     from facadedevice import graph
 
-    graph.numpy_version = numpy_version
     # Reload array_equal
     graph.array_equal = graph.check_numpy_version()
     a = triplet([1, 2], 0.0)
@@ -65,7 +57,7 @@ def test_triplet_constructor():
 
 
 def test_node_setters():
-    mocks = [Mock for _ in range(3)]
+    mocks = [Mock() for _ in range(3)]
     n = Node("test", description="desc", callbacks=mocks)
     assert n.name == "test"
     assert n.description == "desc"
@@ -138,7 +130,7 @@ def test_node_setters():
 
 
 def test_fail_node():
-    mocks = [Mock(side_effect=RuntimeError)]
+    mocks = [MagicMock(side_effect=RuntimeError)]
     n = Node("test", description="desc", callbacks=mocks)
     assert n.name == "test"
     assert n.description == "desc"
@@ -182,8 +174,8 @@ def test_simple_graph():
     assert b.result() == 6
     g.reset()
     # Test 3
-    ma = Mock
-    mb = Mock
+    ma = MagicMock()
+    mb = MagicMock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
@@ -194,8 +186,8 @@ def test_simple_graph():
     mb.assert_called_once_with(b)
     g.reset()
     # Test 4
-    ma = Mock
-    mb = Mock
+    ma = MagicMock()
+    mb = MagicMock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
@@ -293,7 +285,7 @@ def test_diamond_graph():
     # Test 3
     mocks = {}
     for x in "abcdefg":
-        mocks[x] = Mock
+        mocks[x] = MagicMock()
         graph[x].callbacks.append(mocks[x])
     graph["a"].set_result(2)
     assert graph["b"].result() == 20

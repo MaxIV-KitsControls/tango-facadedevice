@@ -3,6 +3,7 @@
 # Imports
 import time
 import pytest
+from unittest.mock import Mock
 
 from tango.server import command
 from tango.test_context import DeviceTestContext
@@ -17,7 +18,7 @@ from facadedevice import local_attribute, logical_attribute
 from test_simple import event_mock
 
 
-def test_logical_attribute(mocker):
+def test_logical_attribute():
     class Test(Facade):
         @logical_attribute(dtype=float, bind=["A", "B"])
         def C(self, a, b):
@@ -28,8 +29,9 @@ def test_logical_attribute(mocker):
         B = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
     time.time
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test 1
@@ -54,7 +56,7 @@ def test_logical_attribute(mocker):
         archive_events["C"].assert_called_with(*expected)
 
 
-def test_diamond_attribute(mocker):
+def test_diamond_attribute():
     class Test(Facade):
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -71,8 +73,9 @@ def test_diamond_attribute(mocker):
         def D(self, a, b, c):
             return a + b + c
 
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test 1
@@ -96,7 +99,7 @@ def test_diamond_attribute(mocker):
         archive_events["D"].assert_called_once_with(*expected)
 
 
-def test_logical_attribute_with_exception(mocker):
+def test_logical_attribute_with_exception():
     class Test(Facade):
         @logical_attribute(dtype=float, bind=["A", "B"])
         def C(self, a, b):
@@ -111,8 +114,9 @@ def test_logical_attribute_with_exception(mocker):
             self.graph["B"].set_exception(exception)
 
     exception = RuntimeError("Ooops")
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test
@@ -147,7 +151,7 @@ def test_logical_attribute_with_exception(mocker):
                 assert "Ooops" in exc.args[0].desc
 
 
-def test_logical_attribute_missing_method(mocker):
+def test_logical_attribute_missing_method():
     class Test(Facade):
 
         C = logical_attribute(dtype=float, bind=["A", "B"])
@@ -161,7 +165,7 @@ def test_logical_attribute_missing_method(mocker):
         assert "No update method defined" in proxy.status()
 
 
-def test_logical_attribute_missing_binding(mocker):
+def test_logical_attribute_missing_binding():
     class Test(Facade):
         @logical_attribute(dtype=float, bind=[])
         def C(self, a, b):
@@ -176,7 +180,7 @@ def test_logical_attribute_missing_binding(mocker):
         assert "No binding defined" in proxy.status()
 
 
-def test_logical_attribute_with_invalid_values(mocker):
+def test_logical_attribute_with_invalid_values():
     class Test(Facade):
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -205,8 +209,9 @@ def test_logical_attribute_with_invalid_values(mocker):
             self.graph["A"].set_result(result)
 
     time.time
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test 1
@@ -237,7 +242,7 @@ def test_logical_attribute_with_invalid_values(mocker):
         archive_events["E"].assert_called_with(*expected)
 
 
-def test_logical_attribute_returning_none(mocker):
+def test_logical_attribute_returning_none():
     class Test(Facade):
         @logical_attribute(dtype=float, bind=["A"])
         def B(self, a):
@@ -246,8 +251,9 @@ def test_logical_attribute_returning_none(mocker):
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
     time.time
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test 1
@@ -264,7 +270,7 @@ def test_logical_attribute_returning_none(mocker):
         archive_events["B"].assert_called_with(*expected)
 
 
-def test_logical_attribute_with_custom_aggregation(mocker):
+def test_logical_attribute_with_custom_aggregation():
     class Test(Facade):
         @logical_attribute(
             dtype=float, bind=["A", "B"], standard_aggregation=False
@@ -277,8 +283,9 @@ def test_logical_attribute_with_custom_aggregation(mocker):
         B = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
     time.time
-    change_events, archive_events = event_mock(mocker, Test)
-    mocker.patch("time.time").return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
 
     with DeviceTestContext(Test) as proxy:
         # Test 1
