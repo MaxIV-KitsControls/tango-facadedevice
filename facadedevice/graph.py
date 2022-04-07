@@ -5,7 +5,8 @@
 import time
 import warnings
 from functools import partial
-from collections import Mapping, namedtuple, defaultdict
+from collections import namedtuple, defaultdict
+from collections.abc import Mapping
 
 
 from tango import AttrQuality
@@ -14,6 +15,7 @@ from numpy.version import version as numpy_version
 
 def patched_array_equal(a1, a2):
     from numpy import asarray
+
     try:
         a1, a2 = asarray(a1), asarray(a2)
     except Exception:
@@ -25,10 +27,12 @@ def patched_array_equal(a1, a2):
 
 def check_numpy_version():
     import distutils.version
+
     if distutils.version.StrictVersion(numpy_version) < "1.8":
         return patched_array_equal
     else:
         from numpy import array_equal
+
         return array_equal
 
 
@@ -63,11 +67,13 @@ def compare_triplet(a, b):
     assert isinstance(a, triplet)
     try:
         value, stamp, quality = b
-    except:
+    except Exception:
         return False
-    return (a.stamp == stamp and
-            a.quality == quality and
-            array_equal(a.value, value))
+    return (
+        a.stamp == stamp
+        and a.quality == quality
+        and array_equal(a.value, value)
+    )
 
 
 def from_attr_value(cls, attr_value):
@@ -83,8 +89,8 @@ triplet.from_attr_value = classmethod(from_attr_value)
 
 # Node object
 
-class Node(object):
 
+class Node(object):
     def __init__(self, name, description=None, callbacks=()):
         self._result = None
         self._exception = None
@@ -95,9 +101,7 @@ class Node(object):
     # Setters
 
     def set_result(self, result):
-        diff = (
-            self._exception is not None or
-            self._result != result)
+        diff = self._exception is not None or self._result != result
         self._result = result
         self._exception = None
         if diff:
@@ -105,10 +109,8 @@ class Node(object):
 
     def set_exception(self, exception):
         if not isinstance(exception, BaseException):
-            raise TypeError('Not a valid exception')
-        diff = (
-            self._result is not None or
-            self._exception != exception)
+            raise TypeError("Not a valid exception")
+        diff = self._result is not None or self._exception != exception
         self._result = None
         self._exception = exception
         if diff:
@@ -142,8 +144,8 @@ class Node(object):
 
 # Restricted node
 
-class RestrictedNode(Node):
 
+class RestrictedNode(Node):
     def set_result(self, result):
         if result is not None and not isinstance(result, triplet):
             raise TypeError("Not a triplet (or None)")
@@ -152,8 +154,8 @@ class RestrictedNode(Node):
 
 # Graph object
 
-class Graph(Mapping):
 
+class Graph(Mapping):
     def __init__(self):
         # Graph state
         self._nodes = {}
@@ -216,7 +218,7 @@ class Graph(Mapping):
                 names |= set(current_rule[1]) - seen
             # Check cyclic dependencies
             if node.name in seen:
-                msg = '{} is involved in a cyclic dependency'
+                msg = "{} is involved in a cyclic dependency"
                 raise ValueError(msg.format(node))
             # Set dependencies
             self._dependencies[node] = {self._nodes[name] for name in seen}
@@ -261,7 +263,7 @@ class Graph(Mapping):
                         break
                 # Deadlock
                 else:
-                    warnings.warn('Propagation deadlocked')
+                    warnings.warn("Propagation deadlocked")
                     node = self._pending.pop()
                 # Update and notify
                 self.update(node)

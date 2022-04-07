@@ -24,6 +24,7 @@ from tango import DevFailed, DevState, EventData, EventType, DispLevel
 
 # Proxy metaclass
 
+
 class FacadeMeta(type(EnhancedDevice)):
     """Metaclass for Facade device."""
 
@@ -52,10 +53,11 @@ class FacadeMeta(type(EnhancedDevice)):
 
 # Metaclassing manually for python compatibility
 
-_Facade = FacadeMeta('_Facade', (EnhancedDevice,), {})
+_Facade = FacadeMeta("_Facade", (EnhancedDevice,), {})
 
 
 # Facade device
+
 
 class Facade(_Facade):
     """Base class for facade devices.
@@ -110,7 +112,8 @@ class Facade(_Facade):
         """
         subnodes = self.graph.subnodes(name)
         return collections.OrderedDict(
-            (node.remote_attr, node.result()) for node in subnodes)
+            (node.remote_attr, node.result()) for node in subnodes
+        )
 
     def _get_default_value(self, attr):
         dtype = attr.get_data_type()
@@ -119,7 +122,7 @@ class Facade(_Facade):
 
     def _emulate_subcommand(self, result, *args):
         if args or result is None:
-            raise ValueError('This proxy command is disabled')
+            raise ValueError("This proxy command is disabled")
         return result
 
     # Initialization
@@ -130,18 +133,18 @@ class Facade(_Facade):
         self._graph = Graph()
         self._subcommand_dict = {}
         # Get properties
-        with context('getting', 'properties'):
+        with context("getting", "properties"):
             super(Facade, self).safe_init_device()
         # Configure
         for value in self._class_dict.values():
-            with context('configuring', value):
+            with context("configuring", value):
                 value.configure(self)
         # Build graph
-        with context('building', self._graph):
+        with context("building", self._graph):
             self._graph.build()
         # Connect
         for value in self._class_dict.values():
-            with context('connecting', value):
+            with context("connecting", value):
                 value.connect(self)
 
     # Event subscription
@@ -151,13 +154,15 @@ class Facade(_Facade):
             self.subscribe_event(
                 attr,
                 EventType.CHANGE_EVENT,
-                lambda event: self._on_node_event(node, event))
+                lambda event: self._on_node_event(node, event),
+            )
         except DevFailed:
             try:
                 self.subscribe_event(
                     attr,
                     EventType.PERIODIC_EVENT,
-                    lambda event: self._on_node_event(node, event))
+                    lambda event: self._on_node_event(node, event),
+                )
             except DevFailed:
                 msg = "Can't subscribe to event for attribute {}"
                 self.info_stream(msg.format(attr))
@@ -181,7 +186,7 @@ class Facade(_Facade):
             self.error_stream(msg.format(node))
             return
         # Format attribute name
-        attr_name = '/'.join(event.attr_name.split('/')[-4:])
+        attr_name = "/".join(event.attr_name.split("/")[-4:])
         # Ignore the event if it contains an error
         if event.errors:
             exc = DevFailed(*event.errors)
@@ -218,7 +223,8 @@ class Facade(_Facade):
     def _run_proxy_command(self, key, value):
         """Used when writing a proxy attribute"""
         return self._run_proxy_command_context(
-            key, lambda subcommand, value: subcommand(value), value)
+            key, lambda subcommand, value: subcommand(value), value
+        )
 
     def _run_proxy_command_context(self, key, ctx, *values):
         """Used when running a proxy command"""
@@ -298,7 +304,8 @@ class Facade(_Facade):
         if value is None:
             value = (
                 DevState.FAULT,
-                "The state cannot be computed. Some values are invalid.")
+                "The state cannot be computed. Some values are invalid.",
+            )
         # Unpack value
         try:
             state, status = value
@@ -307,7 +314,7 @@ class Facade(_Facade):
             status = "The device is in {} state.".format(value)
         # Set state and status
         try:
-            with context('setting', 'state and status'):
+            with context("setting", "state and status"):
                 self.set_state(state, stamp, quality)
                 self.set_status(status, stamp, quality)
         # Exception while setting the state
@@ -322,7 +329,7 @@ class Facade(_Facade):
             self.push_change_event(node.name, exception)
             self.push_archive_event(node.name, exception)
             # Log the pushing of exceptions
-            msg = 'Pushing an exception for attribute {}'
+            msg = "Pushing an exception for attribute {}"
             self.debug_exception(exception, msg.format(node.name))
         # Empty result
         elif node.result() is None:
@@ -350,6 +357,7 @@ class Facade(_Facade):
 
 # Timed Facade
 
+
 class TimedFacade(Facade):
     """Similar to the `facadedevice.Facade` base class with time handling.
 
@@ -373,10 +381,8 @@ class TimedFacade(Facade):
     def on_time(self, value):
         pass
 
-    @command(
-        polling_period=1000,
-        display_level=DispLevel.EXPERT)
+    @command(polling_period=1000, display_level=DispLevel.EXPERT)
     def UpdateTime(self):
         t = time.time()
         result = triplet(t, t)
-        self.graph['Time'].set_result(result)
+        self.graph["Time"].set_result(result)

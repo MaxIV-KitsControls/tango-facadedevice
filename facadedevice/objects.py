@@ -16,6 +16,7 @@ from facadedevice.utils import check_attribute, make_subcommand
 
 # Base class object
 
+
 class class_object(object):
     """Provide a base for objects to be processed by ProxyMeta."""
 
@@ -39,6 +40,7 @@ class class_object(object):
 
 # Node object
 
+
 class node_object(class_object):
 
     callback = None
@@ -55,28 +57,34 @@ class node_object(class_object):
         if not self.callback:
             return
         # Add user callback
-        node.callbacks.append(partial(
-            device._run_callback,
-            "running user callback for",
-            self.callback.__get__(device)))
+        node.callbacks.append(
+            partial(
+                device._run_callback,
+                "running user callback for",
+                self.callback.__get__(device),
+            )
+        )
 
     # Binding helper
 
     @staticmethod
     def bind_node(device, node, bind, method, standard_aggregation=True):
         if not method:
-            raise ValueError('No update method defined')
+            raise ValueError("No update method defined")
         if not bind:
-            raise ValueError('No binding defined')
+            raise ValueError("No binding defined")
         # Set the binding
         aggregate = (
-            device._standard_aggregation if standard_aggregation
-            else device._custom_aggregation)
+            device._standard_aggregation
+            if standard_aggregation
+            else device._custom_aggregation
+        )
         func = partial(aggregate, node, method.__get__(device))
         device.graph.add_rule(node, func, bind)
 
 
 # Local attribute
+
 
 class local_attribute(node_object):
     """Tango attribute with event support.
@@ -105,9 +113,11 @@ class local_attribute(node_object):
 
     @property
     def use_default_write(self):
-        return (self.kwargs is not None and
-                self.kwargs.get('access') == AttrWriteType.READ_WRITE and
-                not set(self.kwargs) & set(['fwrite', 'fset']))
+        return (
+            self.kwargs is not None
+            and self.kwargs.get("access") == AttrWriteType.READ_WRITE
+            and not set(self.kwargs) & set(["fwrite", "fset"])
+        )
 
     # Configuration methods
 
@@ -118,8 +128,9 @@ class local_attribute(node_object):
             return
         kwargs = dict(self.kwargs)
         # Read method
-        kwargs['fget'] = lambda device, attr=None: \
-            device._read_from_node(device.graph[key], attr)
+        kwargs["fget"] = lambda device, attr=None: device._read_from_node(
+            device.graph[key], attr
+        )
         # Is allowed method
         method_name = "is_" + key + "_allowed"
         if method_name not in dct:
@@ -132,8 +143,10 @@ class local_attribute(node_object):
             return
         # Set write method
         dct[key] = dct[key].setter(
-            lambda device, value:
-                device._write_to_node(device.graph[key], value))
+            lambda device, value: device._write_to_node(
+                device.graph[key], value
+            )
+        )
 
     def configure(self, device):
         # Build node
@@ -147,10 +160,13 @@ class local_attribute(node_object):
         attr.set_archive_event(True, True)
         attr.set_change_event(True, False)
         # Add push event callback
-        node.callbacks.append(partial(
-            device._run_callback,
-            "pushing events for",
-            device._push_event_for_node))
+        node.callbacks.append(
+            partial(
+                device._run_callback,
+                "pushing events for",
+                device._push_event_for_node,
+            )
+        )
 
     def connect(self, device):
         if not self.method:
@@ -172,6 +188,7 @@ class local_attribute(node_object):
 
 
 # Logical attribute
+
 
 class logical_attribute(local_attribute):
     """Tango attribute computed from the values of other attributes.
@@ -201,7 +218,8 @@ class logical_attribute(local_attribute):
 
     def configure_binding(self, device, node):
         self.bind_node(
-            device, node, self.bind, self.method, self.standard_aggregation)
+            device, node, self.bind, self.method, self.standard_aggregation
+        )
 
     def connect(self, device):
         # Override the local_attribute connect method
@@ -209,6 +227,7 @@ class logical_attribute(local_attribute):
 
 
 # Proxy attribute
+
 
 class proxy_attribute(logical_attribute):
     """Tango attribute linked to the attribute of a remote device.
@@ -243,19 +262,18 @@ class proxy_attribute(logical_attribute):
             return
         # Set write method
         dct[key] = dct[key].setter(
-            lambda device, value:
-                device._run_proxy_command(
-                    key, value))
+            lambda device, value: device._run_proxy_command(key, value)
+        )
 
     def configure_binding(self, device, node):
         # Get properties
         attr = getattr(device, self.property_name).strip()
         # Empty property
         if not attr:
-            msg = 'Property {!r} is empty'
+            msg = "Property {!r} is empty"
             raise ValueError(msg.format(self.property_name))
         # Default value
-        if '/' not in attr:
+        if "/" not in attr:
             node.default_value = literal_eval(attr)
             # Make subcommand
             if self.use_default_write:
@@ -280,15 +298,16 @@ class proxy_attribute(logical_attribute):
         device.graph.add_node(subnode)
         # Binding
         self.bind_node(
-            device, node, bind, self.method, self.standard_aggregation)
+            device, node, bind, self.method, self.standard_aggregation
+        )
 
     def connect(self, device):
         node = device.graph[self.key]
         # Set default_value
-        if hasattr(node, 'default_value'):
+        if hasattr(node, "default_value"):
             node.set_result(triplet(node.default_value))
         # Get subnodes
-        if hasattr(node, 'remote_attr'):
+        if hasattr(node, "remote_attr"):
             subnodes = [node]
         else:
             subnodes = device.graph.subnodes(self.key)
@@ -298,6 +317,7 @@ class proxy_attribute(logical_attribute):
 
 
 # Combined attribute
+
 
 class combined_attribute(proxy_attribute):
     """Tango attribute computed from the values of other remote attributes.
@@ -324,7 +344,7 @@ class combined_attribute(proxy_attribute):
         super(combined_attribute, self).update_class(key, dct)
         # Check write access
         if self.use_default_write:
-            raise ValueError('{} cannot be writable'.format(self))
+            raise ValueError("{} cannot be writable".format(self))
         # Override device property
         if self.create_property:
             doc = "Attributes to be combined as {}.".format(key)
@@ -334,14 +354,14 @@ class combined_attribute(proxy_attribute):
         # Strip property
         attrs = getattr(device, self.property_name)
         if not isinstance(attrs, str):
-            attrs = '\n'.join(attrs)
+            attrs = "\n".join(attrs)
         attrs = attrs.strip()
         # Empty property
         if not attrs:
-            msg = 'Property {!r} is empty'
+            msg = "Property {!r} is empty"
             raise ValueError(msg.format(self.property_name))
         # Default value
-        if '/' not in attrs:
+        if "/" not in attrs:
             node.default_value = literal_eval(attrs)
             return
         # Split lines
@@ -352,16 +372,14 @@ class combined_attribute(proxy_attribute):
             wildcard = attrs[0]
             attrs = list(attributes_from_wildcard(wildcard))
             if not attrs:
-                msg = 'No attributes matching {} wildcard'
+                msg = "No attributes matching {} wildcard"
                 raise ValueError(msg.format(wildcard))
         # Check attributes
         else:
             for attr in attrs:
                 check_attribute(attr)
         # Build the bindings
-        bind = tuple(
-            '{}[{}]'.format(self.key, i)
-            for i, _ in enumerate(attrs))
+        bind = tuple("{}[{}]".format(self.key, i) for i, _ in enumerate(attrs))
         # Build the subnodes
         for key, attr in zip(bind, attrs):
             subnode = RestrictedNode(key)
@@ -369,10 +387,12 @@ class combined_attribute(proxy_attribute):
             device.graph.add_node(subnode)
         # Set the binding
         self.bind_node(
-            device, node, bind, self.method, self.standard_aggregation)
+            device, node, bind, self.method, self.standard_aggregation
+        )
 
 
 # State attribute
+
 
 class state_attribute(node_object):
     """Tango state attribute with event support.
@@ -406,19 +426,24 @@ class state_attribute(node_object):
         super(state_attribute, self).configure(device)
         node = device.graph[self.key]
         # Add set state callback
-        node.callbacks.append(partial(
-            device._run_callback,
-            "setting the state from",
-            device._set_state_from_node))
+        node.callbacks.append(
+            partial(
+                device._run_callback,
+                "setting the state from",
+                device._set_state_from_node,
+            )
+        )
         # Nothing to bind
         if not self.bind and not self.method:
             return
         # Bind node
         self.bind_node(
-            device, node, self.bind, self.method, self.standard_aggregation)
+            device, node, self.bind, self.method, self.standard_aggregation
+        )
 
 
 # Proxy command
+
 
 class proxy_command(class_object):
     """Command to write an attribute or run a command of a remote device.
@@ -438,8 +463,13 @@ class proxy_command(class_object):
     Also supports the standard command keywords.
     """
 
-    def __init__(self, property_name, create_property=True,
-                 write_attribute=False, **kwargs):
+    def __init__(
+        self,
+        property_name,
+        create_property=True,
+        write_attribute=False,
+        **kwargs
+    ):
         self.kwargs = kwargs
         self.property_name = property_name
         self.create_property = create_property
@@ -454,9 +484,9 @@ class proxy_command(class_object):
     def update_class(self, key, dct):
         super(proxy_command, self).update_class(key, dct)
         # Set command
-        dct[key] = lambda device, *args: \
-            device._run_proxy_command_context(
-                key, self.method.__get__(device), *args)
+        dct[key] = lambda device, *args: device._run_proxy_command_context(
+            key, self.method.__get__(device), *args
+        )
         dct[key].__name__ = key
         dct[key] = command(**self.kwargs)(dct[key])
         # Set is allowed method
@@ -466,16 +496,18 @@ class proxy_command(class_object):
             dct[method_name].__name__ = method_name
         # Create property
         if self.create_property:
-            doc = ("Attribute to be written"
-                   if self.write_attribute else
-                   "Subcommand to be executed")
+            doc = (
+                "Attribute to be written"
+                if self.write_attribute
+                else "Subcommand to be executed"
+            )
             doc += " in {} command.".format(key)
             dct[self.property_name] = device_property(dtype=str, doc=doc)
 
     def configure(self, device):
         name = getattr(device, self.property_name).strip()
         # Default value
-        if '/' not in name:
+        if "/" not in name:
             value = literal_eval(name)
             subcommand = partial(device._emulate_subcommand, value)
         # Check subcommand

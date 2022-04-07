@@ -12,69 +12,61 @@ from facadedevice import Facade, proxy_command, utils
 
 
 def test_simple_proxy_command(mocker):
-
     class Test(Facade):
 
         double = proxy_command(
-            property_name='prop',
-            dtype_in=int,
-            dtype_out=int)
+            property_name="prop", dtype_in=int, dtype_out=int
+        )
 
-    mocker.patch('facadedevice.utils.DeviceProxy')
+    mocker.patch("facadedevice.utils.DeviceProxy")
     inner_proxy = utils.DeviceProxy.return_value
-    inner_proxy.dev_name.return_value = 'a/b/c'
-    inner_proxy.command_inout.side_effect = lambda attr, x: x*2
+    inner_proxy.dev_name.return_value = "a/b/c"
+    inner_proxy.command_inout.side_effect = lambda attr, x: x * 2
 
-    with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
+    with DeviceTestContext(Test, properties={"prop": "a/b/c/d"}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
-        utils.DeviceProxy.assert_any_call('a/b/c')
+        utils.DeviceProxy.assert_any_call("a/b/c")
         # Run command
         assert proxy.double(3) == 6
         # Check
-        inner_proxy.command_inout.assert_called_once_with('d', 3)
+        inner_proxy.command_inout.assert_called_once_with("d", 3)
 
 
 def test_complex_proxy_command(mocker):
-
     class Test(Facade):
-
-        @proxy_command(
-            property_name='prop',
-            dtype_in=int)
+        @proxy_command(property_name="prop", dtype_in=int)
         def cmd(self, subcommand, n):
             for _ in range(n):
                 subcommand()
 
-    mocker.patch('facadedevice.utils.DeviceProxy')
+    mocker.patch("facadedevice.utils.DeviceProxy")
     inner_proxy = utils.DeviceProxy.return_value
-    inner_proxy.dev_name.return_value = 'a/b/c'
+    inner_proxy.dev_name.return_value = "a/b/c"
 
-    with DeviceTestContext(Test, properties={'prop': 'a/b/c/d'}) as proxy:
+    with DeviceTestContext(Test, properties={"prop": "a/b/c/d"}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
-        utils.DeviceProxy.assert_any_call('a/b/c')
+        utils.DeviceProxy.assert_any_call("a/b/c")
         # Run command
         proxy.cmd(3)
         # Check
-        expected = [mocker.call('d')] * 3
+        expected = [mocker.call("d")] * 3
         assert inner_proxy.command_inout.call_args_list == expected
 
 
 def test_disabled_proxy_command(mocker):
-
     class Test(Facade):
 
         double = proxy_command(
-            property_name='prop',
-            dtype_in=int,
-            dtype_out=int)
+            property_name="prop", dtype_in=int, dtype_out=int
+        )
 
-    mocker.patch('facadedevice.utils.DeviceProxy')
+    mocker.patch("facadedevice.utils.DeviceProxy")
 
-    with DeviceTestContext(Test, properties={'prop': 'None'}) as proxy:
+    with DeviceTestContext(Test, properties={"prop": "None"}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
@@ -87,16 +79,13 @@ def test_disabled_proxy_command(mocker):
 
 
 def test_emulated_proxy_command(mocker):
-
     class Test(Facade):
 
-        get_pi = proxy_command(
-            property_name='prop',
-            dtype_out=float)
+        get_pi = proxy_command(property_name="prop", dtype_out=float)
 
-    mocker.patch('facadedevice.utils.DeviceProxy')
+    mocker.patch("facadedevice.utils.DeviceProxy")
 
-    with DeviceTestContext(Test, properties={'prop': '3.14'}) as proxy:
+    with DeviceTestContext(Test, properties={"prop": "3.14"}) as proxy:
         # Device not in fault
         assert proxy.state() == DevState.UNKNOWN
         # Check mocks
