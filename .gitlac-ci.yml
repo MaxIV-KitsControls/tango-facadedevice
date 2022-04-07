@@ -1,0 +1,6 @@
+include:
+  - project: kits-maxiv/cfg-maxiv-gitlabci
+    file: /.python-ci.yml
+
+variables:
+  PYTEST_EXTRA_ARGS: --forked
