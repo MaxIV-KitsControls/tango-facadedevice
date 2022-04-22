@@ -31,4 +31,5 @@ setup(
     ],
     # Requirements
     install_requires=["pytango>=9.2.1", "numpy"],
+    extras_require={"tests": ["pytest", "pytest-forked"]},
 )
