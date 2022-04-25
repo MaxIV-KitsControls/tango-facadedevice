@@ -16,10 +16,7 @@ setup(
     author="Vincent Michel",
     author_email="vincent.michel@esrf.fr",
     license="GPLv3",
-    url=(
-        "https://gitlab.maxiv.lu.se/"
-        "kits-maxiv/plc2tango/lib-maxiv-facadedevice"
-    ),
+    url="https://gitlab.maxiv.lu.se/kits-maxiv/lib-maxiv-facadedevice",
     # Classifiers
     classifiers=[
         "Intended Audience :: Developers",
