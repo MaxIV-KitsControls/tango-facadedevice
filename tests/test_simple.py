@@ -4,133 +4,127 @@
 import time
 from collections import defaultdict
 
+from unittest.mock import Mock
+
 from tango.server import command
 from tango import DevState, AttrWriteType
 from tango.test_context import DeviceTestContext
 
 # Proxy imports
-from facadedevice.graph import VALID, INVALID, triplet
+from facadedevice.graph import VALID, triplet  # , INVALID
 from facadedevice import Facade, TimedFacade, state_attribute
 from facadedevice import local_attribute
 
 
 def event_mock(mocker, cls):
-    change = defaultdict(mocker.Mock)
-    archive = defaultdict(mocker.Mock)
-    cls.push_change_event = mocker.Mock(
-        side_effect=lambda key, *args, **kwargs: change[key](*args, **kwargs))
-    cls.push_archive_event = mocker.Mock(
-        side_effect=lambda key, *args, **kwargs: archive[key](*args, **kwargs))
+    change = defaultdict(mocker)
+    archive = defaultdict(mocker)
+    cls.push_change_event = mocker(
+        side_effect=lambda key, *args, **kwargs: change[key](*args, **kwargs)
+    )
+    cls.push_archive_event = mocker(
+        side_effect=lambda key, *args, **kwargs: archive[key](*args, **kwargs)
+    )
     return change, archive
 
 
-def test_empty_device(mocker):
-
+def test_empty_device():
     class Test(Facade):
         pass
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
 
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.UNKNOWN
         assert proxy.status() == "The device is in UNKNOWN state."
-        expected = DevState.UNKNOWN, 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected)
-        archive_events['State'].assert_called_with()  # *expected)
+        # expected = DevState.UNKNOWN, 1.0, VALID
+        change_events["State"].assert_called_with()  # expected)
+        archive_events["State"].assert_called_with()  # expected)
 
 
-def test_simple_device(mocker):
-
+def test_simple_device():
     class Test(TimedFacade):
-
-        @state_attribute(bind=['Time'])
+        @state_attribute(bind=["Time"])
         def State(self, time):
             return DevState.ON, "It's {} o'clock!".format(time)
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
 
     with DeviceTestContext(Test, debug=3) as proxy:
         assert proxy.state() == DevState.ON
         assert proxy.status() == "It's 1.0 o'clock!"
-        expected_state = DevState.ON, 1.0, VALID
-        expected_status = "It's 1.0 o'clock!", 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.ON, 1.0, VALID
+        # expected_status = "It's 1.0 o'clock!", 1.0, VALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)
 
 
-def test_simple_device_no_status(mocker):
-
+def test_simple_device_no_status():
     class Test(TimedFacade):
-
-        @state_attribute(bind=['Time'])
+        @state_attribute(bind=["Time"])
         def State(self, time):
             return DevState.ON
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
 
     with DeviceTestContext(Test, debug=3) as proxy:
         assert proxy.state() == DevState.ON
         assert proxy.status() == "The device is in ON state."
-        expected_state = DevState.ON, 1.0, VALID
-        expected_status = "The device is in ON state.", 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.ON, 1.0, VALID
+        # expected_status = "The device is in ON state.", 1.0, VALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)
 
 
-def test_state_error(mocker):
-
+def test_state_error():
     class Test(TimedFacade):
-
-        @state_attribute(bind=['Time'])
+        @state_attribute(bind=["Time"])
         def State(self, time):
-            raise RuntimeError('Ooops')
+            raise RuntimeError("Ooops")
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
     expected_status = "Exception while updating node <State>:\n"
     expected_status += "  Ooops"
 
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.FAULT
         assert proxy.status() == expected_status
-        expected_state = DevState.FAULT, 1.0, VALID
-        expected_status = expected_status, 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.FAULT, 1.0, VALID
+        # expected_status = expected_status, 1.0, VALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)
 
 
-def test_empty_state(mocker):
-
+def test_empty_state():
     class Test(TimedFacade):
 
-        A = local_attribute(
-            dtype=float,
-            access=AttrWriteType.READ_WRITE)
+        A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
-        @state_attribute(bind=['A'])
+        @state_attribute(bind=["A"])
         def State(self, a):
             return DevState.ON, str(a)
 
         @command
         def reset(self):
-            self.graph['A'].set_result(None)
+            self.graph["A"].set_result(None)
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
 
     with DeviceTestContext(Test) as proxy:
         assert proxy.state() == DevState.UNKNOWN
@@ -143,7 +137,6 @@ def test_empty_state(mocker):
 
 
 def test_delete_device():
-
     class Test(Facade):
         pass
 
@@ -154,9 +147,7 @@ def test_delete_device():
 
 
 def test_delete_device_fail():
-
     class Test(Facade):
-
         @command
         def break_device(self):
             self._graph = None
@@ -166,11 +157,10 @@ def test_delete_device_fail():
         assert proxy.state() == DevState.UNKNOWN
         proxy.break_device()
         info = proxy.getinfo()
-        assert 'Error while resetting the graph' in info
+        assert "Error while resetting the graph" in info
 
 
-def test_manual_state(mocker):
-
+def test_manual_state():
     class Test(TimedFacade):
 
         State = state_attribute()
@@ -178,11 +168,11 @@ def test_manual_state(mocker):
         @command
         def On(self):
             result = triplet(DevState.ON, time.time())
-            self.graph['State'].set_result(result)
+            self.graph["State"].set_result(result)
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
 
     with DeviceTestContext(Test, debug=3) as proxy:
         assert proxy.state() == DevState.UNKNOWN
@@ -190,22 +180,20 @@ def test_manual_state(mocker):
         proxy.On()
         assert proxy.state() == DevState.ON
         assert proxy.status() == "The device is in ON state."
-        expected_state = DevState.ON, 1.0, VALID
-        expected_status = "The device is in ON state.", 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.ON, 1.0, VALID
+        # expected_status = "The device is in ON state.", 1.0, VALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)
 
 
-def test_exception_registration(mocker):
-
+def test_exception_registration():
     class Test(Facade):
-
         @command
         def oops(self):
             try:
-                1/0
+                1 / 0
             except Exception as exc:
                 exc.__traceback__ = None
                 self.ignore_exception(exc)
@@ -217,17 +205,15 @@ def test_exception_registration(mocker):
         assert "by zero" in info
 
 
-def test_simple_device_invalid_state(mocker):
-
+def test_simple_device_invalid_state():
     class Test(TimedFacade):
-
-        @state_attribute(bind=['Time'])
+        @state_attribute(bind=["Time"])
         def State(self, time):
             return None
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
     expected = "The state cannot be computed. Some values are invalid."
 
     with DeviceTestContext(Test, debug=3) as proxy:
@@ -235,25 +221,23 @@ def test_simple_device_invalid_state(mocker):
         assert proxy.status() == expected
         assert proxy.read_attribute("State").value == DevState.FAULT
         assert proxy.read_attribute("State").quality == VALID
-        expected_state = DevState.FAULT, 1.0, INVALID
-        expected_status = expected, 1.0, INVALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.FAULT, 1.0, INVALID
+        # expected_status = expected, 1.0, INVALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)
 
 
-def test_simple_device_state_type_error(mocker):
-
+def test_simple_device_state_type_error():
     class Test(TimedFacade):
-
-        @state_attribute(bind=['Time'])
+        @state_attribute(bind=["Time"])
         def State(self, time):
             return "Not a state"
 
-    time.time
-    mocker.patch('time.time').return_value = 1.0
-    change_events, archive_events = event_mock(mocker, Test)
+    time.time = Mock()
+    time.time.return_value = 1.0
+    change_events, archive_events = event_mock(Mock, Test)
     expected = """\
 Exception while setting state and status:
   Python argument types in
@@ -266,9 +250,9 @@ Exception while setting state and status:
         assert proxy.status() == expected
         assert proxy.read_attribute("State").value == DevState.FAULT
         assert proxy.read_attribute("State").quality == VALID
-        expected_state = DevState.FAULT, 1.0, VALID
-        expected_status = expected, 1.0, VALID
-        change_events['State'].assert_called_with()  # *expected_state)
-        archive_events['State'].assert_called_with()  # *expected_state)
-        change_events['Status'].assert_called_with()  # *expected_status)
-        archive_events['Status'].assert_called_with()  # *expected_status)
+        # expected_state = DevState.FAULT, 1.0, VALID
+        # expected_status = expected, 1.0, VALID
+        change_events["State"].assert_called_with()  # *expected_state)
+        archive_events["State"].assert_called_with()  # *expected_state)
+        change_events["Status"].assert_called_with()  # *expected_status)
+        archive_events["Status"].assert_called_with()  # *expected_status)

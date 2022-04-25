@@ -1,7 +1,7 @@
-
 # Imports
 import numpy
 import pytest
+from unittest.mock import MagicMock, Mock, patch
 
 # Facade imports
 from facadedevice.graph import Node, RestrictedNode, Graph, triplet
@@ -9,26 +9,19 @@ from facadedevice.graph import VALID, INVALID
 from facadedevice.graph import patched_array_equal
 
 
-def test_patched_array_equal(mocker):
+def test_patched_array_equal():
     assert patched_array_equal([1], [1])
     assert not patched_array_equal([1], [2])
     assert not patched_array_equal([1, 2], [1])
-    asarray_mock = mocker.Mock()
-    asarray_mock.shape
-    asarray_mock.side_effect = Exception()
-    numpy.asarray = asarray_mock
-    assert not patched_array_equal([123], [123])
+    with patch("numpy.asarray") as asarray_mock:
+        asarray_mock.side_effect = RuntimeError("asarray fails")
+        assert not patched_array_equal([123], [123])
 
 
-@pytest.fixture(params=[numpy.version.version, "1.7.1", "1.8.0"])
-def numpy_version(request):
-    return request.param
-
-
-def test_compare_triplet(numpy_version):
+def test_compare_triplet():
     # Mock numpy version
     from facadedevice import graph
-    graph.numpy_version = numpy_version
+
     # Reload array_equal
     graph.array_equal = graph.check_numpy_version()
     a = triplet([1, 2], 0.0)
@@ -45,17 +38,17 @@ def test_compare_triplet(numpy_version):
     assert a != f != b
     assert a != g != b
     assert a != 1 != b
-    assert a != 'test' != b
-    assert a != 'tes' != b
-    h = triplet(['test'], 0.0, VALID)
+    assert a != "test" != b
+    assert a != "tes" != b
+    h = triplet(["test"], 0.0, VALID)
     assert h == h
 
 
 def test_triplet_constructor():
     with pytest.raises(TypeError):
-        triplet([1], 'not a float')
+        triplet([1], "not a float")
     with pytest.raises(TypeError):
-        triplet([1], 0.0, 'not a quality')
+        triplet([1], 0.0, "not a quality")
     with pytest.raises(TypeError):
         triplet(triplet(1))
     value, stamp, quality = triplet(1)
@@ -63,11 +56,11 @@ def test_triplet_constructor():
     assert quality == VALID
 
 
-def test_node_setters(mocker):
-    mocks = [mocker.Mock() for _ in range(3)]
-    n = Node('test', description='desc', callbacks=mocks)
-    assert n.name == 'test'
-    assert n.description == 'desc'
+def test_node_setters():
+    mocks = [Mock() for _ in range(3)]
+    n = Node("test", description="desc", callbacks=mocks)
+    assert n.name == "test"
+    assert n.description == "desc"
     assert repr(n) == "node <test>"
     assert n.exception() is None
     assert n.result() is None
@@ -97,7 +90,7 @@ def test_node_setters(mocker):
         m.assert_called_with(n)
         m.reset_mock()
     # Set exception
-    d = RuntimeError('Ooops')
+    d = RuntimeError("Ooops")
     n.set_exception(d)
     assert n.exception() == d
     with pytest.raises(RuntimeError):
@@ -113,7 +106,7 @@ def test_node_setters(mocker):
     for m in mocks:
         assert not m.called
     # Set different exception
-    e = IOError('Bim!')
+    e = IOError("Bim!")
     n.set_exception(e)
     assert n.exception() == e
     with pytest.raises(IOError):
@@ -136,11 +129,11 @@ def test_node_setters(mocker):
         assert not m.called
 
 
-def test_fail_node(mocker):
-    mocks = [mocker.Mock(side_effect=RuntimeError)]
-    n = Node('test', description='desc', callbacks=mocks)
-    assert n.name == 'test'
-    assert n.description == 'desc'
+def test_fail_node():
+    mocks = [MagicMock(side_effect=RuntimeError)]
+    n = Node("test", description="desc", callbacks=mocks)
+    assert n.name == "test"
+    assert n.description == "desc"
     assert n.exception() is None
     assert n.result() is None
     for m in mocks:
@@ -159,15 +152,15 @@ def test_fail_node(mocker):
     assert "RuntimeError" in record[0].message.args[0]
 
 
-def test_simple_graph(mocker):
-    a = Node('a')
-    b = Node('b')
+def test_simple_graph():
+    a = Node("a")
+    b = Node("b")
     g = Graph()
     g.add_node(a)
     g.add_node(b)
     assert len(g) == 2
-    assert set(g) == {'a', 'b'}
-    g.add_rule(b, lambda a: a.result()*2, ['a'])
+    assert set(g) == {"a", "b"}
+    g.add_rule(b, lambda a: a.result() * 2, ["a"])
     # Test 1
     g.build()
     a.set_result(2)
@@ -181,8 +174,8 @@ def test_simple_graph(mocker):
     assert b.result() == 6
     g.reset()
     # Test 3
-    ma = mocker.Mock()
-    mb = mocker.Mock()
+    ma = MagicMock()
+    mb = MagicMock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
@@ -193,12 +186,12 @@ def test_simple_graph(mocker):
     mb.assert_called_once_with(b)
     g.reset()
     # Test 4
-    ma = mocker.Mock()
-    mb = mocker.Mock()
+    ma = MagicMock()
+    mb = MagicMock()
     a.callbacks.append(ma)
     b.callbacks.append(mb)
     g.build()
-    a.set_exception(RuntimeError('Oops'))
+    a.set_exception(RuntimeError("Oops"))
     with pytest.raises(RuntimeError):
         a.result()
     with pytest.raises(RuntimeError):
@@ -210,29 +203,29 @@ def test_simple_graph(mocker):
 
 def test_cyclic_graph():
     # Test 1
-    a = Node('a')
-    b = Node('b')
+    a = Node("a")
+    b = Node("b")
     g = Graph()
     g.add_node(a)
     g.add_node(b)
-    g.add_rule(b, lambda a: a.result()*2, ['a'])
-    g.add_rule(a, lambda b: b.result()/2, ['b'])
+    g.add_rule(b, lambda a: a.result() * 2, ["a"])
+    g.add_rule(a, lambda b: b.result() / 2, ["b"])
     with pytest.raises(ValueError) as context:
         g.build()
     assert "cyclic" in str(context.value)
     assert a.callbacks == []
     assert b.callbacks == []
     # Test 2
-    a = Node('a')
+    a = Node("a")
     g = Graph()
     g.add_node(a)
-    g.add_rule(a, lambda a: a.result()*2, ['a'])
+    g.add_rule(a, lambda a: a.result() * 2, ["a"])
     with pytest.raises(ValueError) as context:
         g.build()
     assert "cyclic" in str(context.value)
     assert a.callbacks == []
     # Test 3
-    a = Node('a')
+    a = Node("a")
     g = Graph()
     g.build()
     g._dependencies[a].add(a)
@@ -244,7 +237,7 @@ def test_cyclic_graph():
     assert "deadlock" in record[0].message.args[0]
 
 
-def test_diamond_graph(mocker):
+def test_diamond_graph():
     # Create graph
     graph = Graph()
     for x in "abcdefg":
@@ -256,58 +249,58 @@ def test_diamond_graph(mocker):
         try:
             return x.result()
         except ZeroDivisionError:
-            return float('inf')
+            return float("inf")
 
     def add(x, y):
         return x.result() + y.result()
 
     # Set the rules
-    graph.add_rule(graph['b'], lambda a: a.result() * 10, ['a'])
-    graph.add_rule(graph['c'], lambda a: a.result() * 100, ['a'])
-    graph.add_rule(graph['d'], lambda c: c.result() // 100, ['c'])
-    graph.add_rule(graph['e'], add, ['b', 'd'])
-    graph.add_rule(graph['f'], lambda a: 1. / a.result(), ['a'])
-    graph.add_rule(graph['g'], recover, ['f'])
+    graph.add_rule(graph["b"], lambda a: a.result() * 10, ["a"])
+    graph.add_rule(graph["c"], lambda a: a.result() * 100, ["a"])
+    graph.add_rule(graph["d"], lambda c: c.result() // 100, ["c"])
+    graph.add_rule(graph["e"], add, ["b", "d"])
+    graph.add_rule(graph["f"], lambda a: 1.0 / a.result(), ["a"])
+    graph.add_rule(graph["g"], recover, ["f"])
 
     # Build graph
     graph.build()
 
     # Test 1
-    graph['a'].set_result(0)
-    for x in 'abcde':
+    graph["a"].set_result(0)
+    for x in "abcde":
         assert graph[x].result() == 0
     with pytest.raises(ZeroDivisionError):
-        assert graph['f'].result()
-    assert graph['g'].result() == float('inf')
+        assert graph["f"].result()
+    assert graph["g"].result() == float("inf")
 
     # Test 2
-    graph['a'].set_result(1)
-    assert graph['b'].result() == 10
-    assert graph['c'].result() == 100
-    assert graph['d'].result() == 1
-    assert graph['e'].result() == 11
-    assert graph['f'].result() == 1
-    assert graph['g'].result() == 1
+    graph["a"].set_result(1)
+    assert graph["b"].result() == 10
+    assert graph["c"].result() == 100
+    assert graph["d"].result() == 1
+    assert graph["e"].result() == 11
+    assert graph["f"].result() == 1
+    assert graph["g"].result() == 1
 
     # Test 3
     mocks = {}
     for x in "abcdefg":
-        mocks[x] = mocker.Mock()
+        mocks[x] = MagicMock()
         graph[x].callbacks.append(mocks[x])
-    graph['a'].set_result(2)
-    assert graph['b'].result() == 20
-    assert graph['c'].result() == 200
-    assert graph['d'].result() == 2
-    assert graph['e'].result() == 22
-    assert graph['f'].result() == 0.5
-    assert graph['g'].result() == 0.5
+    graph["a"].set_result(2)
+    assert graph["b"].result() == 20
+    assert graph["c"].result() == 200
+    assert graph["d"].result() == 2
+    assert graph["e"].result() == 22
+    assert graph["f"].result() == 0.5
+    assert graph["g"].result() == 0.5
     for x in "abcdefg":
         mocks[x].assert_called_once_with(graph[x])
 
     # Test 3
     for x in "abcdefg":
         mocks[x].reset_mock()
-    graph['a'].set_exception(RuntimeError('Ooops'))
+    graph["a"].set_exception(RuntimeError("Ooops"))
     for x in "bcdefg":
         with pytest.raises(RuntimeError):
             graph[x].result()
@@ -317,21 +310,21 @@ def test_diamond_graph(mocker):
 
 def test_wrong_graph():
     g = Graph()
-    g.add_node(Node('a'))
+    g.add_node(Node("a"))
     with pytest.raises(ValueError):
-        g.add_node(Node('a'))
+        g.add_node(Node("a"))
     with pytest.raises(ValueError):
-        g.add_rule(Node('b'), lambda a: a.result(), ['a'])
-    b = Node('b')
+        g.add_rule(Node("b"), lambda a: a.result(), ["a"])
+    b = Node("b")
     g.add_node(b)
-    g.add_rule(b, lambda a: a.result(), ['a'])
+    g.add_rule(b, lambda a: a.result(), ["a"])
     with pytest.raises(ValueError):
-        g.add_rule(b, lambda a: a.result(), ['a'])
+        g.add_rule(b, lambda a: a.result(), ["a"])
 
 
 def test_restricted_triplet():
-    node = RestrictedNode('a')
-    node.set_result(triplet(0., 0.))
-    assert node.result() == triplet(0., 0.)
+    node = RestrictedNode("a")
+    node.set_result(triplet(0.0, 0.0))
+    assert node.result() == triplet(0.0, 0.0)
     with pytest.raises(TypeError):
-        node.set_result(0.)
+        node.set_result(0.0)

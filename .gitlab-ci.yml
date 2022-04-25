@@ -1,0 +1,7 @@
+include:
+  - project: kits-maxiv/cfg-maxiv-gitlabci
+    file: /.python-ci.yml
+
+variables:
+  MODULE_NAME: facadedevice
+  PYTEST_EXTRA_ARGS: --forked

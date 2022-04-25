@@ -30,6 +30,7 @@ ATTR_NOT_ALLOWED = "API_AttrNotAllowed"
 
 # Default attribute value
 
+
 def get_default_attribute_value(dformat, dtype):
     if dformat == AttrDataFormat.IMAGE:
         return ((),)
@@ -43,14 +44,16 @@ def get_default_attribute_value(dformat, dtype):
 
 # Aggregate qualities
 
+
 def aggregate_qualities(qualities):
     length = len(AttrQuality.values)
-    sortable = map(lambda x: (x-1) % length, qualities)
+    sortable = map(lambda x: (x - 1) % length, qualities)
     result = (min(sortable) + 1) % length
     return AttrQuality.values[result]
 
 
 # Patched device proxy
+
 
 def create_device_proxy(*args, **kwargs):
     proxy = DeviceProxy(*args, **kwargs)
@@ -60,12 +63,14 @@ def create_device_proxy(*args, **kwargs):
 
 # Split attribute name
 
+
 def split_tango_name(name):
-    lst = name.split('/')
-    return '/'.join(lst[:-1]), lst[-1]
+    lst = name.split("/")
+    return "/".join(lst[:-1]), lst[-1]
 
 
 # Attribute check
+
 
 def check_attribute(name, writable=False):
     device, attr = split_tango_name(name)
@@ -78,6 +83,7 @@ def check_attribute(name, writable=False):
 
 # Attribute from wildcard
 
+
 def attributes_from_wildcard(wildcard):
     db = Database()
     wdev, wattr = split_tango_name(wildcard)
@@ -86,10 +92,11 @@ def attributes_from_wildcard(wildcard):
         infos = proxy.attribute_list_query()
         attrs = sorted(info.name.lower() for info in infos)
         for attr in fnmatch.filter(attrs, wattr):
-            yield '{}/{}'.format(device.lower(), attr)
+            yield "{}/{}".format(device.lower(), attr)
 
 
 # Tango command check
+
 
 def check_command(name):
     device, cmd = split_tango_name(name)
@@ -98,6 +105,7 @@ def check_command(name):
 
 
 # Make subcommand
+
 
 def make_subcommand(name, attr=False):
     # Check value
@@ -115,6 +123,7 @@ def make_subcommand(name, attr=False):
 
 # Device class
 
+
 class EnhancedDevice(Device):
     """Enhanced version of server.Device"""
 
@@ -128,7 +137,7 @@ class EnhancedDevice(Device):
 
     def register_exception(self, exc, msg=None, ignore=False):
         # Stream traceback
-        self.debug_stream(traceback_string(exc).replace('%', '%%'))
+        self.debug_stream(traceback_string(exc).replace("%", "%%"))
         # Exception as a string
         status = exception_string(exc, wrap=msg)
         # Stream error
@@ -147,7 +156,7 @@ class EnhancedDevice(Device):
 
     def debug_exception(self, exc, msg=None):
         string = exception_string(exc, wrap=msg)
-        self.debug_stream(string.replace('%', '%%'))
+        self.debug_stream(string.replace("%", "%%"))
 
     # Initialization and cleanup
 
@@ -156,7 +165,7 @@ class EnhancedDevice(Device):
         Device.get_device_properties(self, cls)
         for key, value in self.device_property_list.items():
             if value[2] is None:
-                raise ValueError('Missing property: ' + key)
+                raise ValueError("Missing property: " + key)
 
     def init_device(self):
         # Init attributes
@@ -167,10 +176,10 @@ class EnhancedDevice(Device):
         self._eid_counter = itertools.count(1)
         self._exception_history = collections.defaultdict(int)
         # Init state and status events
-        self.set_change_event('State', True, False)
-        self.set_archive_event('State', True, True)
-        self.set_change_event('Status', True, False)
-        self.set_archive_event('Status', True, True)
+        self.set_change_event("State", True, False)
+        self.set_archive_event("State", True, True)
+        self.set_change_event("Status", True, False)
+        self.set_archive_event("Status", True, True)
         # Set INIT state
         self.set_state(DevState.INIT)
         # Initialize the device
@@ -209,8 +218,10 @@ class EnhancedDevice(Device):
     def _wrap_callback(self, callback, eid):
         def wrapped(event):
             # Fix libtango bug #316
-            if self._init_ident is not None and \
-               self._init_ident != get_ident():
+            if (
+                self._init_ident is not None
+                and self._init_ident != get_ident()
+            ):
                 return  # pragma: no cover
             # Acquire monitor lock
             try:
@@ -221,10 +232,18 @@ class EnhancedDevice(Device):
             except Exception as exc:
                 message = "Exception while running event callback {}"
                 self.ignore_exception(exc, message.format(eid))
+
         return wrapped
 
-    def subscribe_event(self, attr_name, event_type, callback,
-                        filters=[], stateless=False, proxy=None):
+    def subscribe_event(
+        self,
+        attr_name,
+        event_type,
+        callback,
+        filters=[],
+        stateless=False,
+        proxy=None,
+    ):
         # Get proxy
         if proxy is None:
             device_name, attr_name = split_tango_name(attr_name)
@@ -236,7 +255,8 @@ class EnhancedDevice(Device):
         # Subscribe
         try:
             proxy_eid = proxy.subscribe_event(
-                attr_name, event_type, wrapped, filters, stateless)
+                attr_name, event_type, wrapped, filters, stateless
+            )
         # Error
         except Exception:
             del self._event_dict[eid]
@@ -252,7 +272,7 @@ class EnhancedDevice(Device):
     def unsubscribe_all(self):
         for eid in list(self._event_dict):
             proxy, attr_name, _, _ = self._event_dict[eid]
-            attr_name = '/'.join((proxy.dev_name(), attr_name))
+            attr_name = "/".join((proxy.dev_name(), attr_name))
             try:
                 self.unsubscribe_event(eid)
             except Exception as exc:
@@ -271,23 +291,24 @@ class EnhancedDevice(Device):
         if stamp is None:
             stamp = time.time()
         # Pushing specific values for events on state attribute doesn't work
-        self.push_change_event('State')  # ... state, stamp, quality)
-        self.push_archive_event('State')  # ... state, stamp, quality)
+        self.push_change_event("State")  # ... state, stamp, quality)
+        self.push_archive_event("State")  # ... state, stamp, quality)
 
     def set_status(self, status, stamp=None, quality=AttrQuality.ATTR_VALID):
         super(Device, self).set_status(status)
         if stamp is None:
             stamp = time.time()
         # Pushing specific values for events on status attribute doesn't work
-        self.push_change_event('Status')  # ... state, stamp, quality)
-        self.push_archive_event('Status')  # ... state, stamp, quality)
+        self.push_change_event("Status")  # ... state, stamp, quality)
+        self.push_archive_event("Status")  # ... state, stamp, quality)
 
     # Commands
 
     @command(
         dtype_out=str,
         doc_out="Information about events and exceptions.",
-        display_level=DispLevel.EXPERT)
+        display_level=DispLevel.EXPERT,
+    )
     def GetInfo(self):
         lines = []
         # Connection
@@ -298,10 +319,12 @@ class EnhancedDevice(Device):
             lines.append(self.get_status())
         # Event subscription
         if self._event_dict:
-            lines.append("It subscribed to event channel "
-                         "of the following attribute(s):")
+            lines.append(
+                "It subscribed to event channel "
+                "of the following attribute(s):"
+            )
             for proxy, attr_name, _, event_type in self._event_dict.values():
-                attr_name = '/'.join((proxy.dev_name(), attr_name))
+                attr_name = "/".join((proxy.dev_name(), attr_name))
                 lines.append("- {} ({})".format(attr_name, event_type))
         else:
             lines.append("It doesn't hold a subsription to any event channel.")
@@ -312,11 +335,11 @@ class EnhancedDevice(Device):
             msg = "Error history since {} (last initialization):"
             lines.append(msg.format(strtime))
             for key, value in self._exception_history.items():
-                string = 'once' if value == 1 else '{} times'.format(value)
-                lines.append(' - Raised {}:'.format(string))
-                lines.extend(' ' * 4 + line for line in key.split('\n'))
+                string = "once" if value == 1 else "{} times".format(value)
+                lines.append(" - Raised {}:".format(string))
+                lines.extend(" " * 4 + line for line in key.split("\n"))
         else:
             msg = "No errors in history since {} (last initialization)."
             lines.append(msg.format(strtime))
         # Return result
-        return '\n'.join(lines)
+        return "\n".join(lines)
