@@ -15,7 +15,7 @@ setup(
     ),
     author="Vincent Michel",
     author_email="vincent.michel@esrf.fr",
-    license="GPLv3",
+    license="GPL-3.0-or-later",
     url="https://gitlab.maxiv.lu.se/kits-maxiv/lib-maxiv-facadedevice",
     # Classifiers
     classifiers=[
