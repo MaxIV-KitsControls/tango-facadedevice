@@ -8,34 +8,8 @@ from collections import defaultdict, namedtuple
 from collections.abc import Mapping
 from functools import partial
 
-from numpy.version import version as numpy_version
+import numpy as np
 from tango import AttrQuality
-
-
-def patched_array_equal(a1, a2):
-    from numpy import asarray
-
-    try:
-        a1, a2 = asarray(a1), asarray(a2)
-    except Exception:
-        return False
-    if a1.shape != a2.shape:
-        return False
-    return bool(asarray(a1 == a2).all())
-
-
-def check_numpy_version():
-    import distutils.version
-
-    if distutils.version.StrictVersion(numpy_version) < "1.8":
-        return patched_array_equal
-    else:
-        from numpy import array_equal
-
-        return array_equal
-
-
-array_equal = check_numpy_version()
 
 # Constants
 
@@ -68,7 +42,7 @@ def compare_triplet(a, b):
         value, stamp, quality = b
     except Exception:
         return False
-    return a.stamp == stamp and a.quality == quality and array_equal(a.value, value)
+    return a.stamp == stamp and a.quality == quality and np.array_equal(a.value, value)
 
 
 def from_attr_value(cls, attr_value):

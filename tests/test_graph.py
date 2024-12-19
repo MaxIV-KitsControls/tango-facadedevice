@@ -1,5 +1,5 @@
 # Imports
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 import numpy
 import pytest
@@ -11,26 +11,13 @@ from facadedevice.graph import (
     Graph,
     Node,
     RestrictedNode,
-    patched_array_equal,
     triplet,
 )
 
 
-def test_patched_array_equal():
-    assert patched_array_equal([1], [1])
-    assert not patched_array_equal([1], [2])
-    assert not patched_array_equal([1, 2], [1])
-    with patch("numpy.asarray") as asarray_mock:
-        asarray_mock.side_effect = RuntimeError("asarray fails")
-        assert not patched_array_equal([123], [123])
-
-
 def test_compare_triplet():
     # Mock numpy version
-    from facadedevice import graph
 
-    # Reload array_equal
-    graph.array_equal = graph.check_numpy_version()
     a = triplet([1, 2], 0.0)
     b = triplet(numpy.array([1, 2]), 0.0)
     assert a == b == a == ([1, 2], 0.0, VALID) == b
