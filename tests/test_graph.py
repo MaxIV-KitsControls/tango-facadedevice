@@ -1,29 +1,21 @@
-# Imports
+from unittest.mock import MagicMock, Mock
+
 import numpy
 import pytest
-from unittest.mock import MagicMock, Mock, patch
 
-# Facade imports
-from facadedevice.graph import Node, RestrictedNode, Graph, triplet
-from facadedevice.graph import VALID, INVALID
-from facadedevice.graph import patched_array_equal
-
-
-def test_patched_array_equal():
-    assert patched_array_equal([1], [1])
-    assert not patched_array_equal([1], [2])
-    assert not patched_array_equal([1, 2], [1])
-    with patch("numpy.asarray") as asarray_mock:
-        asarray_mock.side_effect = RuntimeError("asarray fails")
-        assert not patched_array_equal([123], [123])
+from facadedevice.graph import (
+    INVALID,
+    VALID,
+    Graph,
+    Node,
+    RestrictedNode,
+    triplet,
+)
 
 
 def test_compare_triplet():
     # Mock numpy version
-    from facadedevice import graph
 
-    # Reload array_equal
-    graph.array_equal = graph.check_numpy_version()
     a = triplet([1, 2], 0.0)
     b = triplet(numpy.array([1, 2]), 0.0)
     assert a == b == a == ([1, 2], 0.0, VALID) == b

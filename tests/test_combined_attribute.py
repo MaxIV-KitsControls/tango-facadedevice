@@ -1,20 +1,14 @@
 """Contain the tests for proxy device server."""
 
-# Imports
-import pytest
+from collections import OrderedDict, namedtuple
 from unittest.mock import MagicMock, Mock, patch
-from collections import namedtuple, OrderedDict
 
-# Tango imports
+import pytest
+from tango import AttrQuality, AttrWriteType, DevState, EventData, EventType
 from tango.test_context import DeviceTestContext
-from tango import DevState, EventType, EventData, AttrQuality
-from tango import AttrWriteType
-
-# Facade imports
-from facadedevice import Facade, combined_attribute, utils
-
-# Local imports
 from test_simple import event_mock
+
+from facadedevice import Facade, combined_attribute, utils
 
 
 def test_combined_attribute():
@@ -86,7 +80,6 @@ def test_combined_attribute():
 
 
 def test_writable_combined_attribute():
-
     with pytest.raises(ValueError) as ctx:
 
         class Test(Facade):

@@ -1,10 +1,15 @@
 from tango import DevState
-from facadedevice import Facade, proxy_command
-from facadedevice import proxy_attribute, logical_attribute, state_attribute
+
+from facadedevice import (
+    Facade,
+    logical_attribute,
+    proxy_attribute,
+    proxy_command,
+    state_attribute,
+)
 
 
 class CameraScreen(Facade):
-
     # Proxy attributes
 
     StatusIn = proxy_attribute(dtype=bool, property_name="StatusInAttribute")

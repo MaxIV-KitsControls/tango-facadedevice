@@ -1,8 +1,7 @@
-from facadedevice import Facade, proxy_attribute, logical_attribute
+from facadedevice import Facade, logical_attribute, proxy_attribute
 
 
 class Division2(Facade):
-
     A = proxy_attribute(dtype=float, property_name="AAttribute")
 
     B = proxy_attribute(dtype=float, property_name="BAttribute")

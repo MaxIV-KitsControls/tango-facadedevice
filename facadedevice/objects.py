@@ -1,18 +1,17 @@
 """Provide class objects for the facade device."""
 
-# Imports
 from ast import literal_eval
 from functools import partial
 
-# Tango imports
 from tango import AttrWriteType
-from tango.server import device_property, command, attribute
+from tango.server import attribute, command, device_property
 
-# Local imports
 from facadedevice.graph import RestrictedNode, triplet
-from facadedevice.utils import attributes_from_wildcard
-from facadedevice.utils import check_attribute, make_subcommand
-
+from facadedevice.utils import (
+    attributes_from_wildcard,
+    check_attribute,
+    make_subcommand,
+)
 
 # Base class object
 
@@ -42,7 +41,6 @@ class class_object(object):
 
 
 class node_object(class_object):
-
     callback = None
 
     def notify(self, callback):
@@ -143,9 +141,7 @@ class local_attribute(node_object):
             return
         # Set write method
         dct[key] = dct[key].setter(
-            lambda device, value: device._write_to_node(
-                device.graph[key], value
-            )
+            lambda device, value: device._write_to_node(device.graph[key], value)
         )
 
     def configure(self, device):
@@ -217,9 +213,7 @@ class logical_attribute(local_attribute):
         self.configure_binding(device, node)
 
     def configure_binding(self, device, node):
-        self.bind_node(
-            device, node, self.bind, self.method, self.standard_aggregation
-        )
+        self.bind_node(device, node, self.bind, self.method, self.standard_aggregation)
 
     def connect(self, device):
         # Override the local_attribute connect method
@@ -297,9 +291,7 @@ class proxy_attribute(logical_attribute):
         subnode.remote_attr = attr
         device.graph.add_node(subnode)
         # Binding
-        self.bind_node(
-            device, node, bind, self.method, self.standard_aggregation
-        )
+        self.bind_node(device, node, bind, self.method, self.standard_aggregation)
 
     def connect(self, device):
         node = device.graph[self.key]
@@ -386,9 +378,7 @@ class combined_attribute(proxy_attribute):
             subnode.remote_attr = attr
             device.graph.add_node(subnode)
         # Set the binding
-        self.bind_node(
-            device, node, bind, self.method, self.standard_aggregation
-        )
+        self.bind_node(device, node, bind, self.method, self.standard_aggregation)
 
 
 # State attribute
@@ -437,9 +427,7 @@ class state_attribute(node_object):
         if not self.bind and not self.method:
             return
         # Bind node
-        self.bind_node(
-            device, node, self.bind, self.method, self.standard_aggregation
-        )
+        self.bind_node(device, node, self.bind, self.method, self.standard_aggregation)
 
 
 # Proxy command
@@ -464,11 +452,7 @@ class proxy_command(class_object):
     """
 
     def __init__(
-        self,
-        property_name,
-        create_property=True,
-        write_attribute=False,
-        **kwargs
+        self, property_name, create_property=True, write_attribute=False, **kwargs
     ):
         self.kwargs = kwargs
         self.property_name = property_name

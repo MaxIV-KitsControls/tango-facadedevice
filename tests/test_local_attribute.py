@@ -1,26 +1,19 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 import time
-import pytest
 from unittest.mock import Mock
 
+import pytest
+from tango import AttrQuality, AttrWriteType, DevFailed, DevState
 from tango.server import command
 from tango.test_context import DeviceTestContext
-from tango import AttrQuality, DevState
-from tango import AttrWriteType, DevFailed
-
-# Proxy imports
-from facadedevice import Facade, triplet
-from facadedevice import local_attribute
-
-# Local imports
 from test_simple import event_mock
+
+from facadedevice import Facade, local_attribute, triplet
 
 
 def test_local_attribute():
     class Test(Facade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @A.notify
@@ -51,7 +44,6 @@ def test_local_attribute():
 
 def test_local_attribute_callback_error():
     class Test(Facade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @A.notify
@@ -78,7 +70,6 @@ def test_local_attribute_callback_error():
 
 def test_local_attribute_empty_push():
     class Test(Facade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @command
@@ -109,7 +100,6 @@ def test_local_attribute_empty_push():
 
 def test_local_attribute_non_exposed():
     class Test(Facade):
-
         A = local_attribute(create_attribute=False)
 
         @A.notify
@@ -138,11 +128,9 @@ def test_local_attribute_non_exposed():
 
 
 def test_invalid_local_attribute():
-
     with pytest.raises(ValueError) as context:
 
         class Test(Facade):
-
             A = local_attribute(dtype=float, create_attribute=False)
 
     assert "Attribute creation is disabled" in str(context.value)

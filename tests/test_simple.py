@@ -1,19 +1,15 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 import time
 from collections import defaultdict
-
 from unittest.mock import Mock
 
+from tango import AttrWriteType, DevState
 from tango.server import command
-from tango import DevState, AttrWriteType
 from tango.test_context import DeviceTestContext
 
-# Proxy imports
-from facadedevice.graph import VALID, triplet  # , INVALID
-from facadedevice import Facade, TimedFacade, state_attribute
-from facadedevice import local_attribute
+from facadedevice import Facade, TimedFacade, local_attribute, state_attribute
+from facadedevice.graph import VALID, triplet
 
 
 def event_mock(mocker, cls):
@@ -111,7 +107,6 @@ def test_state_error():
 
 def test_empty_state():
     class Test(TimedFacade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @state_attribute(bind=["A"])
@@ -162,7 +157,6 @@ def test_delete_device_fail():
 
 def test_manual_state():
     class Test(TimedFacade):
-
         State = state_attribute()
 
         @command

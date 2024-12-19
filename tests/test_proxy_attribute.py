@@ -2,22 +2,16 @@
 
 from unittest.mock import Mock, patch
 
-# Tango imports
+from tango import AttrQuality, AttrWriteType, DevFailed, DevState, EventData, EventType
 from tango.server import command
 from tango.test_context import DeviceTestContext
-from tango import DevState, EventType, EventData, AttrQuality
-from tango import AttrWriteType, DevFailed
-
-# Facade imports
-from facadedevice import Facade, proxy_attribute, utils
-
-# Local imports
 from test_simple import event_mock
+
+from facadedevice import Facade, proxy_attribute, utils
 
 
 def test_proxy_attribute():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
     change_events, archive_events = event_mock(Mock, Test)
@@ -104,7 +98,6 @@ def test_proxy_attribute_with_convertion():
 
 def test_writable_proxy_attribute():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
@@ -150,7 +143,6 @@ def test_writable_proxy_attribute():
 
 def test_proxy_attribute_with_periodic_event():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
     def sub(attr, etype, *args):
@@ -195,7 +187,6 @@ def test_proxy_attribute_with_periodic_event():
 
 def test_proxy_attribute_not_evented():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
     change_events, archive_events = event_mock(Mock, Test)
@@ -224,7 +215,6 @@ def test_proxy_attribute_not_evented():
 
 def test_proxy_attribute_with_wrong_events():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
     change_events, archive_events = event_mock(Mock, Test)
@@ -263,9 +253,7 @@ def test_proxy_attribute_with_wrong_events():
             archive_events["attr"].assert_not_called()
             # Check info
             info = proxy.getinfo()
-            assert (
-                "Received an event from a/b/c/d that contains errors" in info
-            )
+            assert "Received an event from a/b/c/d that contains errors" in info
             assert "Ooops" in info
             # Error event
             event = Mock(spec=EventData)
@@ -288,14 +276,12 @@ def test_proxy_attribute_with_wrong_events():
 
 def test_disabled_proxy_attribute():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
 
     change_events, archive_events = event_mock(Mock, Test)
     with patch("facadedevice.utils.DeviceProxy") as device_proxy:
-
         with DeviceTestContext(Test, properties={"prop": "None"}) as proxy:
             # Device not in fault
             assert proxy.state() == DevState.UNKNOWN
@@ -307,14 +293,12 @@ def test_disabled_proxy_attribute():
 
 def test_emulated_proxy_attribute():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
 
     change_events, archive_events = event_mock(Mock, Test)
     with patch("facadedevice.utils.DeviceProxy") as device_proxy:
-
         with DeviceTestContext(Test, properties={"prop": "0.5"}) as proxy:
             # Device not in fault
             assert proxy.state() == DevState.UNKNOWN
@@ -328,7 +312,6 @@ def test_emulated_proxy_attribute():
 
 def test_non_writable_proxy_attribute():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
@@ -348,7 +331,6 @@ def test_non_writable_proxy_attribute():
 
 def test_missing_property():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
@@ -362,7 +344,6 @@ def test_missing_property():
 
 def test_empty_property():
     class Test(Facade):
-
         attr = proxy_attribute(
             dtype=float, property_name="prop", access=AttrWriteType.READ_WRITE
         )
@@ -376,7 +357,6 @@ def test_empty_property():
 
 def test_proxy_attribute_broken_internals():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
         @command
@@ -402,7 +382,6 @@ def test_proxy_attribute_broken_internals():
 
 def test_proxy_attribute_broken_unsubscription():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
         @command
@@ -422,15 +401,12 @@ def test_proxy_attribute_broken_unsubscription():
             proxy.delete()
             # Check info
             info = proxy.getinfo()
-            assert (
-                "Exception while unsubscribing from attribute a/b/c/d" in info
-            )
+            assert "Exception while unsubscribing from attribute a/b/c/d" in info
             assert "Ooops" in info
 
 
 def test_exception_on_monitor_lock():
     class Test(Facade):
-
         attr = proxy_attribute(dtype=float, property_name="prop")
 
     with patch("facadedevice.utils.DeviceProxy") as inner_proxy:
@@ -438,13 +414,9 @@ def test_exception_on_monitor_lock():
         inner_proxy.dev_name.return_value = "a/b/c"
         subscribe_event = inner_proxy.subscribe_event
         with patch("facadedevice.utils.AutoTangoMonitor") as monitor_mock:
-            monitor_mock.return_value.__enter__.side_effect = RuntimeError(
-                "Ooops"
-            )
+            monitor_mock.return_value.__enter__.side_effect = RuntimeError("Ooops")
 
-            with DeviceTestContext(
-                Test, properties={"prop": "a/b/c/d"}
-            ) as proxy:
+            with DeviceTestContext(Test, properties={"prop": "a/b/c/d"}) as proxy:
                 # Device not in fault
                 assert proxy.state() == DevState.UNKNOWN
                 # Check mocks

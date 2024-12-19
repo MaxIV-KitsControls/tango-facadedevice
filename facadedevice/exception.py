@@ -1,13 +1,10 @@
 """Provide helpers for exception handling."""
 
-# Imports
-
 import sys
 import traceback
 from contextlib import contextmanager
 
 from tango import DevFailed, Except
-
 
 # Safe traceback string
 

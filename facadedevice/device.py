@@ -1,26 +1,19 @@
 """Provide the facade device class and metaclass."""
 
-# Imports
-import time
 import collections
+import time
 
-# Graph imports
-from facadedevice.graph import triplet, Graph, INVALID
-
-# Exception imports
-from facadedevice.exception import to_dev_failed, context
-
-# Utils imports
-from facadedevice.utils import EnhancedDevice, aggregate_qualities
-from facadedevice.utils import get_default_attribute_value
-
-# Object imports
-from facadedevice.objects import class_object, local_attribute
-
-# Tango imports
+from tango import DevFailed, DevState, DispLevel, EventData, EventType
 from tango.server import command
-from tango import DevFailed, DevState, EventData, EventType, DispLevel
 
+from facadedevice.exception import context, to_dev_failed
+from facadedevice.graph import INVALID, Graph, triplet
+from facadedevice.objects import class_object, local_attribute
+from facadedevice.utils import (
+    EnhancedDevice,
+    aggregate_qualities,
+    get_default_attribute_value,
+)
 
 # Proxy metaclass
 
