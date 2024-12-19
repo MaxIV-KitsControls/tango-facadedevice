@@ -325,7 +325,7 @@ class EnhancedDevice(Device):
         # Event subscription
         if self._event_dict:
             lines.append(
-                "It subscribed to event channel " "of the following attribute(s):"
+                "It subscribed to event channel of the following attribute(s):"
             )
             for proxy, attr_name, _, event_type in self._event_dict.values():
                 attr_name = "/".join((proxy.dev_name(), attr_name))
