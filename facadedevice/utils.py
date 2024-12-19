@@ -1,19 +1,16 @@
 """Provide helpers for tango."""
 
-# Imports
 import collections
 import fnmatch
 import functools
 import itertools
 import time
 
-# Conditional imports
 try:
     from threading import get_ident
 except ImportError:  # pragma: no cover
     from threading import _get_ident as get_ident
 
-# Exception imports
 from tango import (
     AttrDataFormat,
     AttrQuality,
@@ -25,8 +22,6 @@ from tango import (
     DevState,
     DispLevel,
 )
-
-# Tango imports
 from tango.server import Device, command
 
 from facadedevice.exception import exception_string, traceback_string

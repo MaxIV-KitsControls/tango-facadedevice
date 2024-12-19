@@ -1,10 +1,8 @@
-# Imports
 from unittest.mock import MagicMock, Mock
 
 import numpy
 import pytest
 
-# Facade imports
 from facadedevice.graph import (
     INVALID,
     VALID,

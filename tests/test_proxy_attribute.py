@@ -3,15 +3,10 @@
 from unittest.mock import Mock, patch
 
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState, EventData, EventType
-
-# Tango imports
 from tango.server import command
 from tango.test_context import DeviceTestContext
-
-# Local imports
 from test_simple import event_mock
 
-# Facade imports
 from facadedevice import Facade, proxy_attribute, utils
 
 

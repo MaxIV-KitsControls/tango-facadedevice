@@ -1,23 +1,14 @@
 """Provide the facade device class and metaclass."""
 
-# Imports
 import collections
 import time
 
-# Tango imports
 from tango import DevFailed, DevState, DispLevel, EventData, EventType
 from tango.server import command
 
-# Exception imports
 from facadedevice.exception import context, to_dev_failed
-
-# Graph imports
 from facadedevice.graph import INVALID, Graph, triplet
-
-# Object imports
 from facadedevice.objects import class_object, local_attribute
-
-# Utils imports
 from facadedevice.utils import (
     EnhancedDevice,
     aggregate_qualities,

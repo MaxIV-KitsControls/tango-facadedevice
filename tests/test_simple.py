@@ -1,6 +1,5 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 import time
 from collections import defaultdict
 from unittest.mock import Mock
@@ -10,9 +9,7 @@ from tango.server import command
 from tango.test_context import DeviceTestContext
 
 from facadedevice import Facade, TimedFacade, local_attribute, state_attribute
-
-# Proxy imports
-from facadedevice.graph import VALID, triplet  # , INVALID
+from facadedevice.graph import VALID, triplet
 
 
 def event_mock(mocker, cls):

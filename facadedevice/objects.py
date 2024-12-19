@@ -1,14 +1,11 @@
 """Provide class objects for the facade device."""
 
-# Imports
 from ast import literal_eval
 from functools import partial
 
-# Tango imports
 from tango import AttrWriteType
 from tango.server import attribute, command, device_property
 
-# Local imports
 from facadedevice.graph import RestrictedNode, triplet
 from facadedevice.utils import (
     attributes_from_wildcard,

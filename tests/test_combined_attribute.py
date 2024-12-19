@@ -1,19 +1,13 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 from collections import OrderedDict, namedtuple
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
-# Tango imports
 from tango import AttrQuality, AttrWriteType, DevState, EventData, EventType
 from tango.test_context import DeviceTestContext
-
-# Local imports
 from test_simple import event_mock
 
-# Facade imports
 from facadedevice import Facade, combined_attribute, utils
 
 

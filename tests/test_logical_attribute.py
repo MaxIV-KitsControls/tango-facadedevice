@@ -1,6 +1,5 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 import time
 from unittest.mock import Mock
 
@@ -8,11 +7,8 @@ import pytest
 from tango import AttrQuality, AttrWriteType, DevFailed, DevState
 from tango.server import command
 from tango.test_context import DeviceTestContext
-
-# Local imports
 from test_simple import event_mock
 
-# Proxy imports
 from facadedevice import Facade, local_attribute, logical_attribute, triplet
 
 

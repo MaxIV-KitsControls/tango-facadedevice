@@ -1,15 +1,11 @@
 """Contain the tests for proxy device server."""
 
-# Imports
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Tango imports
 from tango import DevFailed, DevState
 from tango.test_context import DeviceTestContext
 
-# Facade imports
 from facadedevice import Facade, proxy_command, utils
 
 

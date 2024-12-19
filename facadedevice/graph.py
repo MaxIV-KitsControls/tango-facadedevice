@@ -1,7 +1,5 @@
 """Provide objects for building reactive graphs."""
 
-# Imports
-
 import time
 import warnings
 from collections import defaultdict, namedtuple
