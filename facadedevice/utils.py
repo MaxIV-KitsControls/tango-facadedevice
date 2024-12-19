@@ -1,11 +1,11 @@
 """Provide helpers for tango."""
 
 # Imports
-import time
-import fnmatch
-import itertools
-import functools
 import collections
+import fnmatch
+import functools
+import itertools
+import time
 
 # Conditional imports
 try:
@@ -14,14 +14,22 @@ except ImportError:  # pragma: no cover
     from threading import _get_ident as get_ident
 
 # Exception imports
-from facadedevice.exception import traceback_string, exception_string
+from tango import (
+    AttrDataFormat,
+    AttrQuality,
+    AttrWriteType,
+    AutoTangoMonitor,
+    CmdArgType,
+    Database,
+    DeviceProxy,
+    DevState,
+    DispLevel,
+)
 
 # Tango imports
 from tango.server import Device, command
-from tango import AutoTangoMonitor, Database, DeviceProxy
-from tango import AttrQuality, AttrWriteType, DevState, DispLevel
-from tango import AttrDataFormat, CmdArgType
 
+from facadedevice.exception import exception_string, traceback_string
 
 # Constants
 
@@ -218,10 +226,7 @@ class EnhancedDevice(Device):
     def _wrap_callback(self, callback, eid):
         def wrapped(event):
             # Fix libtango bug #316
-            if (
-                self._init_ident is not None
-                and self._init_ident != get_ident()
-            ):
+            if self._init_ident is not None and self._init_ident != get_ident():
                 return  # pragma: no cover
             # Acquire monitor lock
             try:
@@ -320,8 +325,7 @@ class EnhancedDevice(Device):
         # Event subscription
         if self._event_dict:
             lines.append(
-                "It subscribed to event channel "
-                "of the following attribute(s):"
+                "It subscribed to event channel " "of the following attribute(s):"
             )
             for proxy, attr_name, _, event_type in self._event_dict.values():
                 attr_name = "/".join((proxy.dev_name(), attr_name))

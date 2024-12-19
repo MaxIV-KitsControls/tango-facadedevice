@@ -1,12 +1,12 @@
 """Contain the tests for proxy device server."""
 
 # Imports
-import pytest
-
 from unittest.mock import Mock, patch
 
+import pytest
+
 # Tango imports
-from tango import DevState, DevFailed
+from tango import DevFailed, DevState
 from tango.test_context import DeviceTestContext
 
 # Facade imports
@@ -15,10 +15,7 @@ from facadedevice import Facade, proxy_command, utils
 
 def test_simple_proxy_command():
     class Test(Facade):
-
-        double = proxy_command(
-            property_name="prop", dtype_in=int, dtype_out=int
-        )
+        double = proxy_command(property_name="prop", dtype_in=int, dtype_out=int)
 
     with patch("facadedevice.utils.DeviceProxy") as inner_proxy:
         inner_proxy = utils.DeviceProxy.return_value
@@ -58,20 +55,14 @@ def test_complex_proxy_command():
             mock = Mock(return_value=None)
             for i in range(3):
                 mock("d")
-            assert (
-                inner_proxy.command_inout.call_args_list == mock.call_args_list
-            )
+            assert inner_proxy.command_inout.call_args_list == mock.call_args_list
 
 
 def test_disabled_proxy_command():
     class Test(Facade):
-
-        double = proxy_command(
-            property_name="prop", dtype_in=int, dtype_out=int
-        )
+        double = proxy_command(property_name="prop", dtype_in=int, dtype_out=int)
 
     with patch("facadedevice.utils.DeviceProxy") as inner_proxy:
-
         with DeviceTestContext(Test, properties={"prop": "None"}) as proxy:
             # Device not in fault
             assert proxy.state() == DevState.UNKNOWN
@@ -86,11 +77,9 @@ def test_disabled_proxy_command():
 
 def test_emulated_proxy_command():
     class Test(Facade):
-
         get_pi = proxy_command(property_name="prop", dtype_out=float)
 
     with patch("facadedevice.utils.DeviceProxy") as inner_proxy:
-
         with DeviceTestContext(Test, properties={"prop": "3.14"}) as proxy:
             # Device not in fault
             assert proxy.state() == DevState.UNKNOWN

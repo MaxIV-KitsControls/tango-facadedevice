@@ -1,8 +1,7 @@
-from facadevice import Facade, proxy_attribute, logical_attribute
+from facadevice import Facade, logical_attribute, proxy_attribute
 
 
 class Rectangle(Facade):
-
     Width = proxy_attribute(property_name="WidthAttribute")
 
     Height = proxy_attribute(property_name="HeightAttribute")

@@ -8,7 +8,6 @@ from contextlib import contextmanager
 
 from tango import DevFailed, Except
 
-
 # Safe traceback string
 
 

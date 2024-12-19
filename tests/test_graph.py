@@ -1,12 +1,19 @@
 # Imports
-import numpy
-import pytest
 from unittest.mock import MagicMock, Mock, patch
 
+import numpy
+import pytest
+
 # Facade imports
-from facadedevice.graph import Node, RestrictedNode, Graph, triplet
-from facadedevice.graph import VALID, INVALID
-from facadedevice.graph import patched_array_equal
+from facadedevice.graph import (
+    INVALID,
+    VALID,
+    Graph,
+    Node,
+    RestrictedNode,
+    patched_array_equal,
+    triplet,
+)
 
 
 def test_patched_array_equal():

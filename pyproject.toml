@@ -36,3 +36,15 @@ Repository = "https://gitlab.maxiv.lu.se/kits-maxiv/lib-maxiv-facadedevice"
 
 [tool.pytest.ini_options]
 addopts = "-v --forked"
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E4",  # Import
+    "E7",  # Statement
+    "E9",  # Runtime
+    # Pyflakes
+    "F",
+    # isort
+    "I",
+]

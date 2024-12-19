@@ -4,13 +4,12 @@
 
 import time
 import warnings
-from functools import partial
-from collections import namedtuple, defaultdict
+from collections import defaultdict, namedtuple
 from collections.abc import Mapping
+from functools import partial
 
-
-from tango import AttrQuality
 from numpy.version import version as numpy_version
+from tango import AttrQuality
 
 
 def patched_array_equal(a1, a2):
@@ -69,11 +68,7 @@ def compare_triplet(a, b):
         value, stamp, quality = b
     except Exception:
         return False
-    return (
-        a.stamp == stamp
-        and a.quality == quality
-        and array_equal(a.value, value)
-    )
+    return a.stamp == stamp and a.quality == quality and array_equal(a.value, value)
 
 
 def from_attr_value(cls, attr_value):

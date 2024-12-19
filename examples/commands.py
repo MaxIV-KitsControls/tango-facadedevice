@@ -2,12 +2,9 @@ from facadedevice import Facade, proxy_command
 
 
 class Commands(Facade):
-
     reset = proxy_command(property_name="ResetCommand")
 
-    echo = proxy_command(
-        dtype_in=str, dtype_out=str, property_name="EchoCommand"
-    )
+    echo = proxy_command(dtype_in=str, dtype_out=str, property_name="EchoCommand")
 
     set_level = proxy_command(
         dtype_in=float, property_name="LevelAttribute", write_attribute=True

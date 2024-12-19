@@ -2,20 +2,18 @@
 
 # Imports
 import time
-import pytest
 from unittest.mock import Mock
 
+import pytest
+from tango import AttrQuality, AttrWriteType, DevFailed, DevState
 from tango.server import command
 from tango.test_context import DeviceTestContext
-from tango import AttrQuality, DevState
-from tango import AttrWriteType, DevFailed
-
-# Proxy imports
-from facadedevice import Facade, triplet
-from facadedevice import local_attribute, logical_attribute
 
 # Local imports
 from test_simple import event_mock
+
+# Proxy imports
+from facadedevice import Facade, local_attribute, logical_attribute, triplet
 
 
 def test_logical_attribute():
@@ -58,7 +56,6 @@ def test_logical_attribute():
 
 def test_diamond_attribute():
     class Test(Facade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @logical_attribute(dtype=float, bind=["A"])
@@ -153,7 +150,6 @@ def test_logical_attribute_with_exception():
 
 def test_logical_attribute_missing_method():
     class Test(Facade):
-
         C = logical_attribute(dtype=float, bind=["A", "B"])
 
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
@@ -182,7 +178,6 @@ def test_logical_attribute_missing_binding():
 
 def test_logical_attribute_with_invalid_values():
     class Test(Facade):
-
         A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
         @logical_attribute(dtype=float, bind=["A"])
@@ -193,9 +188,7 @@ def test_logical_attribute_with_invalid_values():
         def C(self, a):
             return [a + 1]
 
-        @logical_attribute(
-            dtype=((float,),), max_dim_x=10, max_dim_y=10, bind=["A"]
-        )
+        @logical_attribute(dtype=((float,),), max_dim_x=10, max_dim_y=10, bind=["A"])
         def D(self, a):
             return [[a + 1]]
 
@@ -272,9 +265,7 @@ def test_logical_attribute_returning_none():
 
 def test_logical_attribute_with_custom_aggregation():
     class Test(Facade):
-        @logical_attribute(
-            dtype=float, bind=["A", "B"], standard_aggregation=False
-        )
+        @logical_attribute(dtype=float, bind=["A", "B"], standard_aggregation=False)
         def C(self, a, b):
             return a.result().value / b.result().value
 

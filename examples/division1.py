@@ -1,9 +1,9 @@
 from tango import AttrWriteType
+
 from facadedevice import Facade, local_attribute, logical_attribute
 
 
 class Division1(Facade):
-
     A = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
 
     B = local_attribute(dtype=float, access=AttrWriteType.READ_WRITE)
