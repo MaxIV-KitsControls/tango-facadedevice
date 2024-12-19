@@ -1,10 +1,38 @@
 [build-system]
-requires = [
-    "setuptools>=45",
-    "wheel",
-    "setuptools_scm>=6.2"
-]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "facadedevice/_version.py"
+version_file = "facadedevice/_version.py"
+
+[tool.setuptools]
+packages = ["facadedevice"]
+
+[project]
+name = "facadedevice"
+dynamic = ["version"]
+authors = [
+  {name = "Vincent Michel", email = "vincent.michel@esrf.fr"},
+]
+maintainers = [
+  {name = "MAX IV KITS Software", email = "kits-sw@maxiv.lu.se"}
+]
+description = "Provide a descriptive interface for reactive high-level Tango devices."
+readme = "README.rst"
+dependencies = [
+    "pytango>=9.2.1",
+    "numpy",
+]
+requires-python = ">=3.6"
+license = {file = "LICENSE.txt"}
+
+[project.optional-dependencies]
+tests = [
+    "pytest", "pytest-forked"
+]
+
+[project.urls]
+Repository = "https://gitlab.maxiv.lu.se/kits-maxiv/lib-maxiv-facadedevice"
+
+[tool.pytest.ini_options]
+addopts = "-v --forked"
